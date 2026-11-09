@@ -65,7 +65,7 @@ for svc in apache2 nginx; do
 done
 
 say "Subindo a aplicação"
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 
 IP="$(curl -fsS https://api.ipify.org || true)"
 DNS="$(dig +short "$DOMAIN" A | tail -n1 || true)"

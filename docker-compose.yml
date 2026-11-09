@@ -3,6 +3,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       DATA_DIR: /data
     volumes:
@@ -12,6 +15,9 @@ services:
   caddy:
     image: caddy:2.8
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "80:80"
       - "443:443"
