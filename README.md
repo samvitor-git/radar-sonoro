@@ -7,6 +7,7 @@ Dashboard pessoal do seu gosto musical: intensidade e humor, vertentes, metas, s
 - **Atualizar com Spotify:** o botão lê suas músicas curtidas, álbuns salvos e as faixas que você pôs nas suas playlists. Busca os gêneros dos artistas, completa energia, valência e BPM pelo ReccoBeats e redesenha a página.
 - **Registro de escuta:** a cada 30 minutos o servidor guarda as últimas faixas que você tocou. É daí que vêm as metas de minutos escutados e de faixas reproduzidas, contadas a partir do dia da instalação.
 - **Atualização automática:** a biblioteca também se atualiza sozinha uma vez por dia, às 5h.
+- **Sugestões:** cada artista sugerido pode ser marcado como Gostei, Médio ou Não gostei. A avaliação tira o artista da lista e o guarda no arquivo "Suas avaliações". O botão **Sugerir novamente** refaz a lista a partir dos seus mais ouvidos e do que entrou na biblioteca nos últimos 6 meses. Os pesos são: Gostei ×3, Médio ×1 e Não gostei −2,5, este último afastando os parecidos. Vertentes que você quer explorar pesam mais. Os artistas parecidos vêm da API pública do Deezer, e link e foto vêm do Spotify.
 - **Acesso:** só a conta do Spotify que fizer o primeiro login entra. Para trocar de dono, apague `data/owner.json`.
 
 ## Instalar ou atualizar no servidor

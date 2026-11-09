@@ -7,6 +7,7 @@ const store = require('./lib/store');
 const sp = require('./lib/spotify');
 const sync = require('./lib/sync');
 const importer = require('./lib/importer');
+const recommend = require('./lib/recommend');
 
 function readBody(req, max) {
   return new Promise((resolve, reject) => {
@@ -36,7 +37,7 @@ const SECURITY = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
-  'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://i.scdn.co https://*.spotifycdn.com; connect-src 'self'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://i.scdn.co https://*.spotifycdn.com https://cdn-images.dzcdn.net https://e-cdns-images.dzcdn.net; connect-src 'self'",
 };
 
 function cookies(req) {
@@ -124,10 +125,26 @@ async function handle(req, res) {
   if (p.startsWith('/api/')) {
     if (!loggedIn(req)) return json(res, 401, {erro: 'Faça login.'});
     if (p === '/api/data') {
-      const d = DEMO || sync.dashboardData();
+      const d = sync.dashboardData();
       return d ? json(res, 200, d) : json(res, 404, {erro: 'Ainda não há dados. Clique em Atualizar com Spotify.'});
     }
     if (p === '/api/status') return json(res, 200, sync.status);
+    if (p === '/api/feedback' && req.method === 'POST') {
+      if (req.headers['x-requested-with'] !== 'radar') return json(res, 403, {erro: 'Pedido inválido.'});
+      let b;
+      try { b = JSON.parse(await readBody(req, 64 * 1024)); } catch { return json(res, 400, {erro: 'Pedido inválido.'}); }
+      const nota = b.nota == null ? null : String(b.nota);
+      if (!b.artista || (nota && !['gostei', 'medio', 'nao'].includes(nota))) return json(res, 400, {erro: 'Avaliação inválida.'});
+      const pick = (k) => String(b[k] || '').slice(0, 300);
+      recommend.rate(String(b.artista).slice(0, 200), nota, {categoria: pick('categoria'), estilo: pick('estilo'), ponte: pick('ponte'), link: pick('link'), foto: pick('foto')});
+      return json(res, 200, {ok: true});
+    }
+    if (p === '/api/recommend' && req.method === 'POST') {
+      if (req.headers['x-requested-with'] !== 'radar') return json(res, 403, {erro: 'Pedido inválido.'});
+      recommend.generate();
+      return json(res, 202, {ok: true});
+    }
+    if (p === '/api/recommend/status') return json(res, 200, recommend.status);
     if (p === '/api/import' && req.method === 'POST') {
       if (req.headers['x-requested-with'] !== 'radar') return json(res, 403, {erro: 'Pedido inválido.'});
       let body;
@@ -146,6 +163,8 @@ async function handle(req, res) {
 
   return serveFile(res, p.slice(1));
 }
+
+if (DEMO && !store.read('dashboard', null)) store.write('dashboard', DEMO);
 
 http.createServer((req, res) => handle(req, res).catch((err) => { console.error(err); send(res, 500, 'Erro interno'); }))
   .listen(PORT, () => console.log(`Radar Sonoro ouvindo na porta ${PORT}${DEMO ? ' (modo demonstração)' : ''}`));

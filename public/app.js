@@ -137,3 +137,44 @@
     document.addEventListener('click', (ev) => { if (more.open && !more.contains(ev.target)) more.open = false; });
   }
 })();
+
+// Avaliações e "Sugerir novamente".
+(function () {
+  const statusEl = document.getElementById('app-status');
+  const say = (text, err, busy) => { statusEl.textContent = text; statusEl.classList.toggle('err', !!err); statusEl.classList.toggle('busy', !!busy); };
+  const post = (url, body) => fetch(url, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'radar'}, body: body ? JSON.stringify(body) : undefined});
+  const reload = async () => {
+    const res = await fetch('/api/data', {credentials: 'same-origin'});
+    if (res.ok) dash.load(await res.json());
+  };
+  const LABEL = {gostei: 'Gostei', medio: 'Médio', nao: 'Não gostei'};
+
+  window.rrRate = async (r, nota, el) => {
+    if (el) el.classList.add('saindo');
+    const res = await post('/api/feedback', {artista: r.artista, nota, categoria: r.categoria, estilo: r.estilo, ponte: r.ponte, link: r.link, foto: r.foto || ''}).catch(() => null);
+    if (!res || !res.ok) { if (el) el.classList.remove('saindo'); say('Não consegui salvar a avaliação.', true); return; }
+    say(nota ? `${r.artista} foi para "${LABEL[nota]}".` : `${r.artista} voltou para as sugestões.`, false, true);
+    setTimeout(() => statusEl.classList.remove('busy'), 2500);
+    await new Promise((ok) => setTimeout(ok, el ? 250 : 0));
+    await reload();
+  };
+
+  const btn = document.getElementById('rr-suggest');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const res = await post('/api/recommend').catch(() => null);
+    if (!res || !res.ok) { btn.disabled = false; say('Não consegui começar as sugestões.', true); return; }
+    for (;;) {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      const s = await (await fetch('/api/recommend/status', {credentials: 'same-origin'})).json();
+      if (s.running) { say(s.step || 'Gerando sugestões…', false, true); continue; }
+      btn.disabled = false;
+      if (s.error) { say('As sugestões falharam: ' + s.error, true); return; }
+      say('Sugestões novas prontas.', false, true);
+      setTimeout(() => statusEl.classList.remove('busy'), 2500);
+      await reload();
+      return;
+    }
+  });
+})();

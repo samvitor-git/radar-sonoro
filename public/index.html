@@ -106,7 +106,7 @@
   .rr-chip { font: inherit; font-size: var(--cds-font-size-caption); padding: 5px 12px; border-radius: 999px; border: 1px solid var(--color-border-line); background: transparent; color: var(--color-fg-muted); cursor: pointer; }
   .rr-chip[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
   .rr-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
-  .rr-recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: var(--cds-gap-md); min-height: 16rem; }
+  .rr-recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 14.5rem), 1fr)); gap: var(--cds-gap-md); min-height: 16rem; }
   .rr-rec { display: flex; flex-direction: column; border-radius: var(--cds-radius); background: var(--color-panel); border: 1px solid var(--color-border-line); overflow: hidden; min-width: 0; }
   .rr-rec .pic { position: relative; display: block; }
   .rr-rec .pic img, .rr-rec .pic .ph { width: 100%; aspect-ratio: 1; max-width: 100%; object-fit: cover; display: block; background: var(--color-border-line); }
@@ -120,6 +120,28 @@
   .rr-rec .bridge b { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
   .rr-rec .start { margin-top: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg); }
   .rr .ph { display: block; }
+  .rr-disc-head { align-items: center; }
+  .rr-suggest { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); padding: 9px 16px; border-radius: 999px; border: 1px solid var(--color-fg); background: var(--color-fg); color: var(--color-bg); cursor: pointer; }
+  .rr-suggest svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .rr-suggest:disabled { opacity: .6; cursor: progress; }
+  .rr-suggest:disabled svg { animation: rr-spin 1.2s linear infinite; }
+  @keyframes rr-spin { to { transform: rotate(360deg); } }
+  .rr-rate { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
+  .rr-rate-btn { white-space: nowrap; font: inherit; font-size: .75rem; font-weight: var(--cds-font-weight-medium); padding: 7px 4px; border-radius: 8px; border: 1px solid var(--color-border-line); background: transparent; color: var(--color-fg); cursor: pointer; }
+  .rr-rate-btn:hover { background: var(--color-bg); }
+  .rr-rate-gostei:hover { border-color: var(--color-ok); color: var(--color-ok); }
+  .rr-rate-nao:hover { border-color: var(--color-bad); color: var(--color-bad); }
+  .rr-rate-btn:focus-visible, .rr-undo:focus-visible, .rr-suggest:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+  .rr-rec.saindo { transition: opacity .3s, transform .3s; opacity: 0; transform: scale(.94); }
+  .rr-archive { gap: var(--cds-gap-md); }
+  .rr-aval-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: 8px; min-height: 3rem; }
+  .rr-aval { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--cds-radius); background: var(--color-bg); min-width: 0; }
+  .rr-aval .who { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-decoration: none; color: inherit; }
+  .rr-aval img, .rr-aval .ph { width: 2.75rem; height: 2.75rem; border-radius: 50%; object-fit: cover; flex: none; background: var(--color-border-line); }
+  .rr-aval .who div { display: flex; flex-direction: column; min-width: 0; }
+  .rr-aval b { font-weight: var(--cds-font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr-aval span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-undo { font: inherit; font-size: var(--cds-font-size-caption); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--color-border-line); background: transparent; color: var(--color-fg-muted); cursor: pointer; flex: none; }
   .rr-nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: var(--cds-gap-md); padding: 8px; margin-bottom: calc(var(--cds-gap-xl) * -0.75); border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border-line); box-shadow: var(--cds-shadow-popover); }
   .rr-nav-links { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; }
   .rr-nav-links::-webkit-scrollbar { display: none; }
@@ -400,8 +422,10 @@
   </section>
 
   <section class="rr-section" id="descobrir">
-    <div class="rr-sechead"><h2>Para descobrir</h2></div>
-    <p class="rr-note">Artistas nas vertentes que você quer explorar. "Novo para você" quer dizer que o artista ainda não aparece nas suas curtidas, álbuns ou playlists; o status é refeito a cada sincronização. A ponte é quem você já ouve e leva até ele. Esta lista não muda com o período.</p>
+    <div class="rr-sechead rr-disc-head"><h2>Para descobrir</h2>
+      <button type="button" class="rr-suggest" id="rr-suggest"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3 M12 18v3 M3 12h3 M18 12h3 M5.6 5.6l2.1 2.1 M16.3 16.3l2.1 2.1 M5.6 18.4l2.1-2.1 M16.3 7.7l2.1-2.1"/></svg>Sugerir novamente</button>
+    </div>
+    <p class="rr-note">Avalie cada artista com <b>Gostei</b>, <b>Médio</b> ou <b>Não gostei</b>: ele sai daqui e vai para o arquivo abaixo. Em <b>Sugerir novamente</b>, a lista é refeita a partir do que você ouve, dando mais peso a quem você gostou, peso normal ao médio e afastando o que se parece com quem você não gostou. <span data-draw="w-sugestoes" data-source="sugestoes_meta">—</span></p>
     <div class="rr-controls">
       <div class="rr-chips" role="group" aria-label="Filtrar por estilo">
         <button type="button" class="rr-chip" data-cat="" aria-pressed="true">Todos</button>
@@ -411,10 +435,21 @@
         <button type="button" class="rr-chip" data-cat="Emocore" aria-pressed="false">Emocore</button>
         <button type="button" class="rr-chip" data-cat="J-Rock e anime" aria-pressed="false">J-Rock e anime</button>
         <button type="button" class="rr-chip" data-cat="Clássicos 70, 80 e 90" aria-pressed="false">Clássicos 70, 80 e 90</button>
+        <button type="button" class="rr-chip" data-cat="Rock brasileiro" aria-pressed="false">Rock brasileiro</button>
+        <button type="button" class="rr-chip" data-cat="Outros" aria-pressed="false">Outros</button>
       </div>
       <label class="rr-toggle" for="rr-only-new"><input type="checkbox" id="rr-only-new"> Só quem é novo para você</label>
     </div>
     <div class="rr-recs" data-draw="recs" data-source="recomendacoes capas"></div>
+    <div class="rr-card rr-archive" id="avaliacoes">
+      <h3>Suas avaliações</h3>
+      <div class="rr-chips rr-aval-tabs" role="group" aria-label="Filtrar avaliações">
+        <button type="button" class="rr-chip" data-aval="gostei" aria-pressed="true">Gostei <span data-draw="n-gostei" data-source="avaliacoes">—</span></button>
+        <button type="button" class="rr-chip" data-aval="medio" aria-pressed="false">Médio <span data-draw="n-medio" data-source="avaliacoes">—</span></button>
+        <button type="button" class="rr-chip" data-aval="nao" aria-pressed="false">Não gostei <span data-draw="n-nao" data-source="avaliacoes">—</span></button>
+      </div>
+      <div class="rr-aval-list" data-draw="arquivo" data-source="avaliacoes capas"></div>
+    </div>
   </section>
 
   <details>
@@ -692,10 +727,10 @@
   });
   window.rr.cat = '';
   window.rr.onlyNew = false;
-  document.querySelectorAll('.rr-chip').forEach((b) => {
+  document.querySelectorAll('.rr-controls .rr-chip').forEach((b) => {
     b.addEventListener('click', () => {
       window.rr.cat = b.getAttribute('data-cat');
-      document.querySelectorAll('.rr-chip').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      document.querySelectorAll('.rr-controls .rr-chip').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
       dash.draw('recs');
     });
   });
@@ -1110,11 +1145,44 @@
     });
   });
 
+  ['gostei', 'medio', 'nao'].forEach((n) => dash.draw('n-' + n, (e) => {
+    const rows = ok('avaliacoes');
+    e.textContent = rows ? '(' + rows.filter((r) => r.nota === n).length + ')' : '';
+  }));
+  dash.draw('w-sugestoes', (e) => {
+    const m = ok('sugestoes_meta');
+    e.textContent = m && m[0] && m[0].gerado_em ? 'Lista gerada em ' + new Date(m[0].gerado_em).toLocaleDateString('pt-BR', {day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'}) + '.' : 'Esta é a lista inicial; clique em Sugerir novamente para gerar a sua.';
+  });
+  dash.draw('arquivo', (e) => {
+    const rows = ok('avaliacoes'); const cm = capaMap();
+    e.replaceChildren();
+    const sel = window.rr.aval || 'gostei';
+    const list = (rows || []).filter((r) => r.nota === sel);
+    if (!list.length) { e.append(el('span', 'rr-empty', 'Nenhum artista aqui ainda.')); return; }
+    list.forEach((r) => {
+      const row = el('div', 'rr-aval');
+      const a = el('a', 'who'); a.href = r.link || ('https://open.spotify.com/search/' + encodeURIComponent(r.artista)); a.target = '_blank'; a.rel = 'noopener';
+      const t = el('div'); t.append(el('b', null, r.artista), el('span', null, [r.categoria, R.dia(r.em)].filter(Boolean).join(' · ')));
+      a.append(img(cm.get('artista|' + r.artista), r.artista), t);
+      const undo = el('button', 'rr-undo', 'Desfazer'); undo.type = 'button';
+      undo.addEventListener('click', () => window.rrRate && window.rrRate(r, null, row));
+      row.append(a, undo);
+      e.append(row);
+    });
+  });
+  document.querySelectorAll('.rr-aval-tabs .rr-chip').forEach((b) => b.addEventListener('click', () => {
+    window.rr.aval = b.getAttribute('data-aval');
+    document.querySelectorAll('.rr-aval-tabs .rr-chip').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    dash.draw('arquivo');
+  }));
+
   dash.draw('recs', (e) => {
     const rows = ok('recomendacoes'); const cm = capaMap();
     if (!rows) return fail(e, 'recomendacoes');
     e.replaceChildren();
-    rows.filter((r) => (!R.cat || r.categoria === R.cat) && (!R.onlyNew || r.status === 'Novo para você')).forEach((r) => {
+    const vis = rows.filter((r) => (!R.cat || r.categoria === R.cat) && (!R.onlyNew || r.status === 'Novo para você'));
+    if (!vis.length) e.append(el('span', 'rr-empty', rows.length ? 'Nenhum artista neste filtro.' : 'Você avaliou todas as sugestões. Clique em Sugerir novamente para receber outras.'));
+    vis.forEach((r) => {
       const card = el('article', 'rr-rec');
       const pic = el('a', 'pic'); pic.href = r.link; pic.target = '_blank'; pic.rel = 'noopener';
       pic.append(img(cm.get('artista|' + r.artista), r.artista), el('span', 'pill' + (r.status === 'Novo para você' ? ' new' : ''), r.status));
@@ -1123,6 +1191,13 @@
       const bridge = el('div', 'bridge'); bridge.append(document.createTextNode('Ponte: '), el('b', null, r.ponte));
       body.append(el('span', 'cat', r.categoria), name, el('span', 'style', r.estilo), bridge);
       if (r.link_faixa) { const s = el('a', 'start', '▶ ' + r.faixa_de_entrada); s.href = r.link_faixa; s.target = '_blank'; s.rel = 'noopener'; body.append(s); }
+      const rate = el('div', 'rr-rate');
+      [['gostei', 'Gostei'], ['medio', 'Médio'], ['nao', 'Não gostei']].forEach(([nota, label]) => {
+        const b = el('button', 'rr-rate-btn rr-rate-' + nota, label); b.type = 'button';
+        b.addEventListener('click', () => window.rrRate && window.rrRate(r, nota, card));
+        rate.append(b);
+      });
+      body.append(rate);
       card.append(pic, body);
       e.append(card);
     });
