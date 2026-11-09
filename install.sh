@@ -57,16 +57,14 @@ if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
   ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
 fi
 
-for svc in apache2 nginx; do
-  if systemctl is-active --quiet "$svc" 2>/dev/null; then
-    warn "O serviço $svc está usando as portas 80/443. Vou pará-lo para o Radar Sonoro funcionar."
-    systemctl disable --now "$svc"
-  fi
-done
+if ss -ltn '( sport = :80 or sport = :443 )' | grep -q LISTEN && ! docker ps --format '{{.Names}}' | grep -q '^radar-sonoro-caddy'; then
+  warn "As portas 80/443 já estão em uso por outro serviço deste servidor. Nada foi alterado nele."
+  echo "O Radar Sonoro precisa entrar atrás do proxy que já existe. Peça a configuração ao Claude."
+  exit 1
+fi
 
 say "Subindo a aplicação"
-docker compose down --remove-orphans >/dev/null 2>&1 || true
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 
 IP="$(curl -fsS https://api.ipify.org || true)"
 DNS="$(dig +short "$DOMAIN" A | tail -n1 || true)"
