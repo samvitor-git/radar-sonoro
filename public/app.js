@@ -3,7 +3,7 @@
   const statusEl = document.getElementById('app-status');
   const btn = document.getElementById('app-sync');
   const fmt = (iso) => new Date(iso).toLocaleString('pt-BR', {day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'});
-  const say = (text, err) => { statusEl.textContent = text; statusEl.classList.toggle('err', !!err); };
+  const say = (text, err, busy) => { statusEl.textContent = text; statusEl.classList.toggle('err', !!err); statusEl.classList.toggle('busy', !!busy); };
 
   const erro = new URLSearchParams(location.search).get('erro');
   if (erro) say(erro, true);
@@ -11,7 +11,7 @@
   async function load() {
     const res = await fetch('/api/data', {credentials: 'same-origin'});
     if (res.status === 401) { location.href = '/'; return false; }
-    if (res.status === 404) { say('Preparando seus dados pela primeira vez…'); return false; }
+    if (res.status === 404) { say('Preparando seus dados pela primeira vez…', false, true); return false; }
     if (!res.ok) { say('Não consegui carregar os dados.', true); dash.fail(); return false; }
     const data = await res.json();
     dash.load(data);
@@ -29,14 +29,14 @@
         await load();
         return;
       }
-      say(s.step || 'Atualizando…');
+      say(s.step || 'Atualizando…', false, true);
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
-    say('Começando…');
+    say('Começando…', false, true);
     const res = await fetch('/api/sync', {method: 'POST', credentials: 'same-origin', headers: {'X-Requested-With': 'radar'}});
     if (!res.ok) { btn.disabled = false; say('Não consegui começar a atualização.', true); return; }
     watch();
@@ -83,7 +83,7 @@
       }
       let faixas = 0, artistas = 0;
       for (let i = 0; i < csvs.length; i++) {
-        say(`Importando exportação (${i + 1} de ${csvs.length})…`);
+        say(`Importando exportação (${i + 1} de ${csvs.length})…`, false, true);
         const res = await fetch('/api/import', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'radar'}, body: JSON.stringify(csvs[i])});
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).erro || 'falha ao enviar ' + csvs[i].name);
         const r = await res.json();
@@ -104,4 +104,36 @@
     else if (s.error) say('A última atualização falhou: ' + s.error, true);
     else if (!loaded) say('Ainda não há dados. Clique em Atualizar com Spotify.');
   }).catch(() => { say('Não consegui carregar os dados.', true); dash.fail(); });
+})();
+
+// Abas do celular: levam à seção e acendem conforme a rolagem.
+(function () {
+  const tabs = [...document.querySelectorAll('.tabbar a[data-tab]')];
+  if (!tabs.length) return;
+  const GROUPS = {topo: 'topo', resumo: 'topo', 'intensidade-humor': 'intensidade-humor', metas: 'metas', favoritas: 'favoritas', recentes: 'favoritas', artistas: 'favoritas', vertentes: 'favoritas', descobrir: 'descobrir'};
+  const sections = Object.keys(GROUPS);
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  tabs.forEach((a) => a.addEventListener('click', (ev) => {
+    const el = document.getElementById(a.dataset.tab);
+    if (!el) return;
+    ev.preventDefault();
+    el.scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'start'});
+    if (window.dash) dash.setLink(el.id);
+  }));
+  const spy = () => {
+    let cur = 'topo';
+    const line = window.innerHeight * 0.35;
+    for (const id of sections) { const el = document.getElementById(id); if (el && el.getBoundingClientRect().top < line) cur = GROUPS[id]; }
+    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) cur = 'descobrir';
+    tabs.forEach((a) => a.setAttribute('aria-current', String(a.dataset.tab === cur)));
+  };
+  window.addEventListener('scroll', spy, {passive: true});
+  window.addEventListener('resize', spy);
+  spy();
+  // Fecha o menu "⋯" ao escolher uma opção ou tocar fora dele.
+  const more = document.querySelector('.app-more');
+  if (more) {
+    more.querySelectorAll('.app-menu-item').forEach((i) => i.addEventListener('click', () => { more.open = false; }));
+    document.addEventListener('click', (ev) => { if (more.open && !more.contains(ev.target)) more.open = false; });
+  }
 })();

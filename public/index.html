@@ -12,14 +12,30 @@
 <script src="/dash-shim.js"></script>
 </head>
 <body>
-<div class="app-bar">
+<header class="app-bar">
   <span class="app-brand">Radar Sonoro</span>
   <span class="app-status" id="app-status" aria-live="polite">Carregando…</span>
-  <label class="app-link app-import" for="app-file" title="Envie o zip (ou os CSVs) do Exportify para completar gêneros e dados de áudio">Importar exportação</label>
+  <div class="rr-seg app-seg" role="group" aria-label="Período">
+    <button type="button" data-periodo="12" aria-pressed="true">12m</button>
+    <button type="button" data-periodo="6" aria-pressed="false">6m</button>
+    <button type="button" data-periodo="3" aria-pressed="false">3m</button>
+    <button type="button" data-periodo="1" aria-pressed="false">1m</button>
+  </div>
+  <label class="app-link app-import app-desk" for="app-file" title="Envie o zip (ou os CSVs) do Exportify para completar gêneros e dados de áudio">Importar exportação</label>
   <input type="file" id="app-file" accept=".zip,.csv" multiple hidden>
-  <button type="button" class="app-btn" id="app-sync">Atualizar com Spotify</button>
-  <a class="app-link" href="/logout">Sair</a>
-</div>
+  <button type="button" class="app-btn" id="app-sync" aria-label="Atualizar com Spotify">
+    <svg class="app-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8 M4 4v4h4 M4 13a8 8 0 0 0 14.3 4.9L20 16 M20 20v-4h-4"/></svg>
+    <span class="app-btn-text">Atualizar com Spotify</span>
+  </button>
+  <a class="app-link app-desk" href="/logout">Sair</a>
+  <details class="app-more">
+    <summary aria-label="Mais opções"><svg class="app-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01 M12 12h.01 M19 12h.01"/></svg></summary>
+    <div class="app-menu">
+      <label class="app-menu-item" for="app-file">Importar exportação do Exportify</label>
+      <a class="app-menu-item" href="/logout">Sair</a>
+    </div>
+  </details>
+</header>
 <main id="dash-root">
 <style>
   .rr { display: flex; flex-direction: column; gap: calc(var(--cds-gap-xl) * 1.5); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
@@ -1114,6 +1130,13 @@
 </script>
 
 </main>
+<nav class="tabbar" aria-label="Seções">
+  <a href="#topo" data-tab="topo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M12 12m-4.5 0a4.5 4.5 0 1 0 9 0a4.5 4.5 0 1 0-9 0 M12 12l6-4.5"/></svg><span>Radar</span></a>
+  <a href="#intensidade-humor" data-tab="intensidade-humor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h3l3-7 4 14 3-7h5"/></svg><span>Humor</span></a>
+  <a href="#metas" data-tab="metas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M12 12m-5 0a5 5 0 1 0 10 0a5 5 0 1 0-10 0 M12 12h.01"/></svg><span>Metas</span></a>
+  <a href="#favoritas" data-tab="favoritas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16 M9 4v16 M14 4l5 16"/></svg><span>Biblioteca</span></a>
+  <a href="#descobrir" data-tab="descobrir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M15.5 8.5 13 13l-4.5 2.5L11 11z"/></svg><span>Descobrir</span></a>
+</nav>
 <script src="/app.js"></script>
 </body>
 </html>
