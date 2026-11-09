@@ -11,7 +11,7 @@
   async function load() {
     const res = await fetch('/api/data', {credentials: 'same-origin'});
     if (res.status === 401) { location.href = '/'; return false; }
-    if (res.status === 404) { say('Ainda não há dados. Clique em Atualizar com Spotify.'); dash.fail(); return false; }
+    if (res.status === 404) { say('Preparando seus dados pela primeira vez…'); return false; }
     if (!res.ok) { say('Não consegui carregar os dados.', true); dash.fail(); return false; }
     const data = await res.json();
     dash.load(data);
@@ -42,8 +42,10 @@
     watch();
   });
 
-  load().then(async () => {
+  load().then(async (loaded) => {
     const s = await (await fetch('/api/status', {credentials: 'same-origin'})).json();
     if (s.running) watch();
+    else if (s.error) say('A última atualização falhou: ' + s.error, true);
+    else if (!loaded) say('Ainda não há dados. Clique em Atualizar com Spotify.');
   }).catch(() => { say('Não consegui carregar os dados.', true); dash.fail(); });
 })();
