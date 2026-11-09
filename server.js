@@ -6,6 +6,21 @@ const crypto = require('crypto');
 const store = require('./lib/store');
 const sp = require('./lib/spotify');
 const sync = require('./lib/sync');
+const importer = require('./lib/importer');
+
+function readBody(req, max) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > max) { reject(new Error('Arquivo grande demais.')); req.destroy(); return; }
+      chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, 'public');
@@ -113,6 +128,13 @@ async function handle(req, res) {
       return d ? json(res, 200, d) : json(res, 404, {erro: 'Ainda não há dados. Clique em Atualizar com Spotify.'});
     }
     if (p === '/api/status') return json(res, 200, sync.status);
+    if (p === '/api/import' && req.method === 'POST') {
+      if (req.headers['x-requested-with'] !== 'radar') return json(res, 403, {erro: 'Pedido inválido.'});
+      let body;
+      try { body = JSON.parse(await readBody(req, 40 * 1024 * 1024)); } catch (err) { return json(res, 413, {erro: err.message}); }
+      const out = importer.importCsv(String(body.text || ''));
+      return json(res, 200, {arquivo: body.name, ...out});
+    }
     if (p === '/api/sync' && req.method === 'POST') {
       if (DEMO) return json(res, 200, {ok: true, demo: true});
       if (req.headers['x-requested-with'] !== 'radar') return json(res, 403, {erro: 'Pedido inválido.'});

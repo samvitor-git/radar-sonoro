@@ -15,6 +15,8 @@
 <div class="app-bar">
   <span class="app-brand">Radar Sonoro</span>
   <span class="app-status" id="app-status" aria-live="polite">Carregando…</span>
+  <label class="app-link app-import" for="app-file" title="Envie o zip (ou os CSVs) do Exportify para completar gêneros e dados de áudio">Importar exportação</label>
+  <input type="file" id="app-file" accept=".zip,.csv" multiple hidden>
   <button type="button" class="app-btn" id="app-sync">Atualizar com Spotify</button>
   <a class="app-link" href="/logout">Sair</a>
 </div>
@@ -532,7 +534,7 @@
     inputs: ['resumo', 'por_familia', 'metas', 'janelas'],
     fn: (resumo, por_familia, metas, janelas) => ['12', '6', '3', '1'].flatMap((p) => {
       const r = resumo.find((x) => x.periodo === p); const m = metas.find((x) => x.periodo === p);
-      const fam = por_familia.filter((x) => x.periodo === p); const f = janelas.filter((x) => x.periodo === p);
+      const fam = por_familia.filter((x) => x.periodo === p && x.familia !== 'Sem gênero'); const f = janelas.filter((x) => x.periodo === p);
       if (!f.length) return [];
       const n = Number(p); const share = (k) => (fam.find((x) => x.familia === k) || {parte: 0}).parte;
       const top = fam[0] || {parte: 0, familia: ''};

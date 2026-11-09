@@ -67,3 +67,4 @@ a { color: inherit; }
 .app-btn:focus-visible, .app-link:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
 .app-link { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .rr-nav { top: max(8px, env(safe-area-inset-top, 0px)); }
+.app-import { cursor: pointer; text-decoration: underline; }
