@@ -30,8 +30,9 @@
   --cds-ease-out: cubic-bezier(.2, .8, .2, 1);
   color-scheme: light;
 }
+/* Tema escuro: escolhido no menu (data-theme), ou pelo sistema no modo automático. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-bg: #111014;
     --color-panel: #1b1a20;
     --color-fg: #f2f0ec;
@@ -50,6 +51,25 @@
     --cds-shadow-popover: 0 8px 24px rgb(0 0 0 / .45);
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --color-bg: #111014;
+  --color-panel: #1b1a20;
+  --color-fg: #f2f0ec;
+  --color-fg-muted: #a19da8;
+  --color-border-line: #2d2b33;
+  --color-ok: #4ccf86;
+  --color-warn: #f0a24a;
+  --color-bad: #f0685c;
+  --cds-chart-grid: #2a2830;
+  --cds-chart-axis: #4a4752;
+  --cds-chart-muted: #4a4752;
+  --cds-chart-reference: #8c8894;
+  --cds-surface-popover: #24232a;
+  --cds-border: #36343d;
+  --cds-text-secondary: #a19da8;
+  --cds-shadow-popover: 0 8px 24px rgb(0 0 0 / .45);
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -186,3 +206,13 @@ a { color: inherit; }
   #dash-root .rr-rec .cat { display: none; }
   #dash-root .rr-rec .name { font-size: 1rem; }
 }
+
+/* Escolha de tema */
+.app-theme { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-panel); border: 1px solid var(--color-border-line); }
+.app-theme button { font: inherit; font-size: .75rem; font-weight: 600; padding: 5px 10px; border-radius: 999px; border: 0; background: transparent; color: var(--color-fg-muted); cursor: pointer; }
+.app-theme button[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); }
+.app-theme button:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+.app-menu-label { padding: 10px 14px 4px; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--color-fg-muted); }
+.app-menu .app-theme { margin: 0 10px 8px; align-self: stretch; justify-content: space-between; }
+.app-menu .app-theme button { flex: 1; padding: 8px 6px; font-size: .8125rem; }
+@media (max-width: 720px) { .app-bar > .app-theme { display: none; } }

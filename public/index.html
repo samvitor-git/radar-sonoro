@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Radar Sonoro</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#111014">
+<script>(function(){var t='dark';try{t=localStorage.getItem('rs-theme')||'dark';}catch(e){}if(t!=='auto')document.documentElement.setAttribute('data-theme',t);})();</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
 <link rel="stylesheet" href="/theme.css">
@@ -27,10 +30,21 @@
     <svg class="app-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8 M4 4v4h4 M4 13a8 8 0 0 0 14.3 4.9L20 16 M20 20v-4h-4"/></svg>
     <span class="app-btn-text">Atualizar com Spotify</span>
   </button>
+  <div class="app-theme" role="group" aria-label="Tema">
+    <button type="button" data-theme-choice="dark" aria-pressed="false">Escuro</button>
+    <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+    <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
+  </div>
   <a class="app-link app-desk" href="/logout">Sair</a>
   <details class="app-more">
     <summary aria-label="Mais opções"><svg class="app-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h.01 M12 12h.01 M19 12h.01"/></svg></summary>
     <div class="app-menu">
+      <span class="app-menu-label">Tema</span>
+      <div class="app-theme" role="group" aria-label="Tema">
+        <button type="button" data-theme-choice="dark" aria-pressed="false">Escuro</button>
+        <button type="button" data-theme-choice="light" aria-pressed="false">Claro</button>
+        <button type="button" data-theme-choice="auto" aria-pressed="false">Auto</button>
+      </div>
       <label class="app-menu-item" for="app-file">Importar exportação do Exportify</label>
       <a class="app-menu-item" href="/logout">Sair</a>
     </div>

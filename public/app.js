@@ -178,3 +178,22 @@
     }
   });
 })();
+
+// Tema: Escuro (padrão), Claro ou Automático (segue o sistema). Guardado só neste aparelho.
+(function () {
+  const root = document.documentElement;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const get = () => { try { return localStorage.getItem('rs-theme') || 'dark'; } catch (e) { return 'dark'; } };
+  const apply = (t) => {
+    if (t === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', t);
+    document.querySelectorAll('[data-theme-choice]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeChoice === t)));
+    if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--color-bg').trim() || '#111014');
+  };
+  document.querySelectorAll('[data-theme-choice]').forEach((b) => b.addEventListener('click', () => {
+    const t = b.dataset.themeChoice;
+    try { localStorage.setItem('rs-theme', t); } catch (e) { /* sem armazenamento: vale só nesta visita */ }
+    apply(t);
+  }));
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => apply(get()));
+  apply(get());
+})();
