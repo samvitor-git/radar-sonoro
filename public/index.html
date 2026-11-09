@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Radar Sonoro</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+<link rel="stylesheet" href="/theme.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="/dash-shim.js"></script>
+</head>
+<body>
+<div class="app-bar">
+  <span class="app-brand">Radar Sonoro</span>
+  <span class="app-status" id="app-status" aria-live="polite">Carregando…</span>
+  <button type="button" class="app-btn" id="app-sync">Atualizar com Spotify</button>
+  <a class="app-link" href="/logout">Sair</a>
+</div>
+<main id="dash-root">
+<style>
+  .rr { display: flex; flex-direction: column; gap: calc(var(--cds-gap-xl) * 1.5); font-family: var(--font-anthropic-sans); color: var(--color-fg); }
+  .rr h1, .rr h2, .rr h3 { text-wrap: balance; }
+  .rr-hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--cds-gap-xl); align-items: center; padding: var(--cds-pad-lg); border-radius: calc(var(--cds-radius) * 2); background: var(--color-panel); border: 1px solid var(--color-border-line); overflow: hidden; }
+  @media (max-width: 760px) { .rr-hero { grid-template-columns: 1fr; } }
+  .rr-hero-text { display: flex; flex-direction: column; gap: var(--cds-gap-md); min-width: 0; }
+  .rr-eyebrow { font-size: var(--cds-font-size-caption); letter-spacing: .08em; text-transform: uppercase; color: var(--color-fg-muted); }
+  .rr-hero h1 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: calc(var(--cds-font-size-title) * 1.8); line-height: 1.02; letter-spacing: -.01em; }
+  .rr-take { margin: 0; max-width: 60ch; font-size: var(--cds-font-size-body); line-height: 1.6; color: var(--color-fg-muted); }
+  .rr .rr-take b, .rr .rr-stat b { color: var(--color-fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .rr-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border-line); align-self: flex-start; }
+  .rr-seg button { font: inherit; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); padding: 6px 14px; border-radius: 999px; border: 0; background: transparent; color: var(--color-fg-muted); cursor: pointer; transition: background var(--cds-dur-slow), color var(--cds-dur-slow); }
+  .rr-seg button[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); }
+  .rr-seg button:focus-visible, .rr-chip:focus-visible, .rr-toggle input:focus-visible, .rr a:focus-visible { outline: 2px solid var(--color-fg); outline-offset: 2px; }
+  .rr-window { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .rr-mosaic { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; min-height: 12rem; }
+  .rr-mosaic img, .rr-mosaic .ph { width: 100%; aspect-ratio: 1; max-width: 100%; object-fit: cover; border-radius: var(--cds-radius); display: block; background: var(--color-border-line); box-shadow: 0 6px 20px rgb(0 0 0 / .18); }
+  .rr-mosaic > :first-child { grid-column: span 2; grid-row: span 2; }
+  .rr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: var(--cds-gap-md); }
+  .rr-stat { display: flex; flex-direction: column; gap: 4px; padding: var(--cds-pad-md); border-radius: var(--cds-radius); background: var(--color-panel); border: 1px solid var(--color-border-line); min-width: 0; }
+  .rr-stat span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-stat strong { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: calc(var(--cds-font-size-title) * 1.2); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .rr-stat small { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-meter { height: 4px; border-radius: 2px; background: var(--color-border-line); overflow: hidden; }
+  .rr-meter i { display: block; height: 100%; width: 0; border-radius: 2px; background: var(--color-fg); }
+  .rr-section { display: flex; flex-direction: column; gap: var(--cds-gap-md); min-width: 0; }
+  .rr-sechead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--cds-gap-sm); }
+  .rr-sechead h2 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); }
+  .rr-note { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.5; max-width: 72ch; }
+  .rr-rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(9.5rem, 11rem); gap: var(--cds-gap-md); overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; min-height: 14rem; }
+  .rr-tile { display: flex; flex-direction: column; gap: 6px; scroll-snap-align: start; text-decoration: none; color: inherit; min-width: 0; }
+  .rr-tile img, .rr-tile .ph { width: 100%; aspect-ratio: 1; max-width: 100%; object-fit: cover; border-radius: var(--cds-radius); background: var(--color-border-line); box-shadow: 0 4px 14px rgb(0 0 0 / .14); transition: transform var(--cds-dur-slow) var(--cds-ease-out); }
+  .rr-tile:hover img { transform: translateY(-3px); }
+  .rr-tile b { font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr-tile span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr-tile .tag { display: inline-flex; align-items: center; gap: 6px; }
+  .rr-tile .tag i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .rr-artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: var(--cds-gap-sm); min-height: 8rem; }
+  .rr-artist { display: grid; grid-template-columns: 3.5rem minmax(0, 1fr) auto; gap: var(--cds-gap-md); align-items: center; padding: var(--cds-pad-sm); border-radius: var(--cds-radius); background: var(--color-panel); border: 1px solid var(--color-border-line); }
+  .rr-artist img, .rr-artist .ph { width: 3.5rem; height: 3.5rem; border-radius: 6px; object-fit: cover; background: var(--color-border-line); }
+  .rr-artist .who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rr-artist .who b { font-weight: var(--cds-font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr-artist .who span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-artist .n { font-family: var(--font-anthropic-serif); font-size: var(--cds-font-size-heading); font-variant-numeric: tabular-nums; }
+  .rr-rank { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .rr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--cds-gap-md); }
+  .rr-card { min-width: 0; display: flex; flex-direction: column; gap: var(--cds-gap-sm); background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); }
+  .rr-card h3 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .rr-chart { position: relative; width: 100%; min-height: 240px; }
+  .rr-chart.tall { min-height: 360px; }
+  .rr-chart svg { display: block; overflow: visible; }
+  .rr-chart text { font-family: var(--font-anthropic-sans); fill: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .rr-legend { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs) var(--cds-gap-md); margin: 0; padding: 0; list-style: none; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-legend li { display: inline-flex; align-items: center; gap: 6px; }
+  .rr-legend i { width: 10px; height: 10px; border-radius: 50%; background: var(--cds-chart-muted); }
+  .rr-tip { position: absolute; pointer-events: none; display: flex; gap: 8px; align-items: center; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); color: var(--color-fg); max-width: 17rem; z-index: 2; }
+  .rr-tip img { width: 40px; height: 40px; border-radius: 4px; flex: none; }
+  .rr-tip .k { color: var(--cds-text-secondary); }
+  .rr-tablebox { max-height: 26rem; overflow: auto; }
+  .rr-table { width: 100%; border-collapse: collapse; font-size: var(--cds-font-size-body); font-variant-numeric: tabular-nums; }
+  .rr-table th { position: sticky; top: 0; background: var(--color-panel); text-align: left; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+  .rr-table td { padding: var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); }
+  .rr-table .num { text-align: right; }
+  .rr-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .rr-controls { display: flex; flex-wrap: wrap; gap: var(--cds-gap-sm) var(--cds-gap-md); align-items: center; justify-content: space-between; }
+  .rr-chips { display: flex; flex-wrap: wrap; gap: var(--cds-gap-xs); }
+  .rr-chip { font: inherit; font-size: var(--cds-font-size-caption); padding: 5px 12px; border-radius: 999px; border: 1px solid var(--color-border-line); background: transparent; color: var(--color-fg-muted); cursor: pointer; }
+  .rr-chip[aria-pressed="true"] { background: var(--color-fg); color: var(--color-bg); border-color: var(--color-fg); }
+  .rr-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: var(--cds-gap-md); min-height: 16rem; }
+  .rr-rec { display: flex; flex-direction: column; border-radius: var(--cds-radius); background: var(--color-panel); border: 1px solid var(--color-border-line); overflow: hidden; min-width: 0; }
+  .rr-rec .pic { position: relative; display: block; }
+  .rr-rec .pic img, .rr-rec .pic .ph { width: 100%; aspect-ratio: 1; max-width: 100%; object-fit: cover; display: block; background: var(--color-border-line); }
+  .rr-rec .pill { position: absolute; top: 8px; left: 8px; padding: 2px 8px; border-radius: 999px; font-size: var(--cds-font-size-caption); background: var(--cds-surface-popover); color: var(--color-fg); box-shadow: var(--cds-shadow-popover); }
+  .rr-rec .pill.new::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-ok); margin-right: 6px; vertical-align: middle; }
+  .rr-rec .body { display: flex; flex-direction: column; gap: 4px; padding: var(--cds-pad-sm) var(--cds-pad-md) var(--cds-pad-md); }
+  .rr-rec .cat { font-size: var(--cds-font-size-caption); letter-spacing: .04em; text-transform: uppercase; color: var(--color-fg-muted); }
+  .rr-rec .name { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); color: var(--color-fg); text-decoration: none; }
+  .rr-rec .name:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .rr-rec .style, .rr-rec .bridge { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-rec .bridge b { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+  .rr-rec .start { margin-top: 4px; font-size: var(--cds-font-size-caption); color: var(--color-fg); }
+  .rr .ph { display: block; }
+  .rr-nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; display: flex; align-items: center; gap: var(--cds-gap-md); padding: 8px; margin-bottom: calc(var(--cds-gap-xl) * -0.75); border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border-line); box-shadow: var(--cds-shadow-popover); }
+  .rr-nav-links { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 1; }
+  .rr-nav-links::-webkit-scrollbar { display: none; }
+  .rr-nav a { flex: none; padding: 6px 12px; border-radius: 999px; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); text-decoration: none; white-space: nowrap; transition: background var(--cds-dur-slow), color var(--cds-dur-slow); }
+  .rr-nav a:hover { color: var(--color-fg); background: var(--color-panel); }
+  .rr-nav a[aria-current="true"] { color: var(--color-fg); background: var(--color-panel); font-weight: var(--cds-font-weight-medium); }
+  .rr-nav .rr-seg { flex: none; padding: 2px; }
+  .rr-nav .rr-seg button { padding: 4px 10px; }
+  @media (max-width: 640px) { .rr-nav { border-radius: var(--cds-radius); flex-direction: column; align-items: stretch; gap: 6px; } .rr-nav .rr-seg { align-self: stretch; justify-content: space-between; } }
+  .rr [id] { scroll-margin-top: 5.5rem; }
+  .rr-badges { display: flex; flex-wrap: wrap; gap: var(--cds-gap-md); min-height: 9.5rem; }
+  .rr-badge { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 7.25rem; text-align: center; }
+  .rr-badge svg { display: block; width: 6rem; height: 6rem; overflow: visible; filter: drop-shadow(0 4px 10px rgb(0 0 0 / .18)); }
+  .rr-badge b { font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); line-height: 1.25; color: var(--color-fg); }
+  .rr-badge span { font-size: var(--cds-font-size-caption); line-height: 1.3; color: var(--color-fg-muted); }
+  .rr-badge.main svg { width: 7rem; height: 7rem; }
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes rr-pop { from { transform: scale(.85) rotate(-6deg); opacity: .3; } to { transform: none; opacity: 1; } }
+    .rr-badge svg { animation: rr-pop var(--cds-dur-slow) var(--cds-ease-out) both; }
+  }
+  .rr-badges-title { font-size: var(--cds-font-size-caption); letter-spacing: .08em; text-transform: uppercase; color: var(--color-fg-muted); }
+  .rr-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr)); gap: var(--cds-gap-md); }
+  .rr-kpi { display: flex; flex-direction: column; gap: var(--cds-gap-md); padding: var(--cds-pad-lg); border-radius: calc(var(--cds-radius) * 2); background: var(--color-panel); border: 1px solid var(--color-border-line); min-width: 0; }
+  .rr-kpi-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: var(--cds-gap-sm); }
+  .rr-kpi-name { display: flex; flex-direction: column; gap: 2px; }
+  .rr-kpi-name h3 { margin: 0; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .rr-kpi-name span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-kpi-value { display: flex; align-items: baseline; gap: var(--cds-gap-sm); }
+  .rr-kpi-value strong { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: calc(var(--cds-font-size-title) * 2.2); line-height: 1; font-variant-numeric: tabular-nums; }
+  .rr-kpi-value em { font-style: normal; font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); }
+  .rr-delta { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .rr-scale { position: relative; height: 4.2rem; }
+  .rr-scale svg { display: block; overflow: visible; }
+  .rr-scale text { font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-caption); fill: var(--color-fg-muted); }
+  .rr-scale .lbl { fill: var(--color-fg); }
+  .rr-explain { margin: 0; font-size: var(--cds-font-size-body); line-height: 1.55; color: var(--color-fg-muted); max-width: 60ch; }
+  .rr-explain b { color: var(--color-fg); font-weight: var(--cds-font-weight-medium); }
+  .rr-ends { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--cds-gap-sm); min-height: 4.5rem; }
+  .rr-end { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: var(--cds-gap-sm); align-items: center; padding: var(--cds-pad-xs); border-radius: var(--cds-radius); background: var(--color-bg); text-decoration: none; color: inherit; min-width: 0; }
+  .rr-end img, .rr-end .ph { width: 3rem; height: 3rem; border-radius: 4px; object-fit: cover; background: var(--color-border-line); }
+  .rr-end div { display: flex; flex-direction: column; min-width: 0; }
+  .rr-end small { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-end b { font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr-quad { display: grid; grid-template-columns: auto repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, auto) auto; gap: var(--cds-gap-sm); min-height: 14rem; }
+  .rr-quad .axis-y { grid-row: 1 / 3; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-quad .axis-x { grid-column: 2 / 4; text-align: center; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-cell { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 4rem; gap: var(--cds-gap-sm); align-items: end; padding: var(--cds-pad-md); border-radius: var(--cds-radius); border: 1px solid var(--color-border-line); background: var(--color-panel); min-width: 0; overflow: hidden; }
+  .rr-cell .fill { position: absolute; inset: auto 0 0 0; background: var(--color-fg); opacity: .06; }
+  .rr-cell .txt { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rr-cell .txt b { font-weight: var(--cds-font-weight-medium); }
+  .rr-cell .txt span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-cell .txt strong { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; }
+  .rr-cell img, .rr-cell .ph { position: relative; width: 4rem; height: 4rem; border-radius: 4px; object-fit: cover; background: var(--color-border-line); }
+  .rr-cell.top { border-color: var(--color-fg); }
+  .rr-goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: var(--cds-gap-md); }
+  .rr-goal { display: flex; flex-direction: column; gap: var(--cds-gap-sm); padding: var(--cds-pad-lg); border-radius: var(--cds-radius); background: var(--color-panel); border: 1px solid var(--color-border-line); min-width: 0; }
+  .rr-goal h3 { margin: 0; font-size: var(--cds-font-size-body); font-weight: var(--cds-font-weight-medium); }
+  .rr-goal .ring { position: relative; width: 7rem; height: 7rem; }
+  .rr-goal .ring svg { display: block; }
+  .rr-goal .ring .c { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .rr-goal .ring .c strong { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); font-variant-numeric: tabular-nums; line-height: 1; }
+  .rr-goal .ring .c span { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-goal p { margin: 0; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.5; }
+  .rr-goal .state { font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); }
+  .rr-goal.pending { border-style: dashed; background: transparent; }
+  .rr-goal.pending .big { font-family: var(--font-anthropic-serif); font-size: var(--cds-font-size-title); color: var(--color-fg-muted); }
+  .rr-fav { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: var(--cds-gap-md); }
+  .rr-favcard { display: flex; flex-direction: column; gap: var(--cds-gap-md); padding: var(--cds-pad-lg); border-radius: calc(var(--cds-radius) * 2); background: var(--color-panel); border: 1px solid var(--color-border-line); min-width: 0; }
+  .rr-favlist { display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-height: 12rem; }
+  .rr-fav1 { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: var(--cds-gap-md); align-items: center; text-decoration: none; color: inherit; }
+  .rr-fav1 img, .rr-fav1 .ph { width: 7rem; height: 7rem; border-radius: var(--cds-radius); object-fit: cover; background: var(--color-border-line); box-shadow: 0 6px 20px rgb(0 0 0 / .18); }
+  .rr-fav1 div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .rr-fav1 small { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); letter-spacing: .06em; text-transform: uppercase; }
+  .rr-fav1 b { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); line-height: 1.1; overflow-wrap: anywhere; }
+  .rr-fav1 span { color: var(--color-fg-muted); }
+  .rr-favrow { display: grid; grid-template-columns: 1.5rem 2.5rem minmax(0, 1fr); gap: var(--cds-gap-sm); align-items: center; text-decoration: none; color: inherit; font-size: var(--cds-font-size-body); }
+  .rr-favrow img, .rr-favrow .ph { width: 2.5rem; height: 2.5rem; border-radius: 4px; object-fit: cover; background: var(--color-border-line); }
+  .rr-favrow i { font-style: normal; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-variant-numeric: tabular-nums; }
+  .rr-favrow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rr-favrow small { color: var(--color-fg-muted); }
+  .rr details { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); line-height: 1.6; }
+  .rr details summary { cursor: pointer; color: var(--color-fg); }
+  .rr details dl { display: grid; grid-template-columns: minmax(7rem, max-content) 1fr; gap: var(--cds-gap-xs) var(--cds-gap-md); margin: var(--cds-gap-sm) 0 0; }
+  .rr details dt { color: var(--color-fg); }
+  .rr details dd { margin: 0; }
+  .rr .rr-empty { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  [data-dash-source-state=empty] { color: transparent; }
+  [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+  .rr-fail { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: inherit; grid-column: 1 / -1; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rr-fail::before { content: ""; width: .375rem; height: .375rem; border-radius: 50%; background: var(--color-bad); }
+  @media (max-width: 560px) { .rr-hide-sm { display: none; } }
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes rr-in { from { opacity: .4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .rr-in { animation: rr-in var(--cds-dur-slow) var(--cds-ease-out); }
+  }
+</style>
+
+<div class="rr">
+  <nav class="rr-nav" aria-label="Seções">
+    <div class="rr-nav-links">
+      <a href="#topo" data-target="topo">Radar</a>
+      <a href="#intensidade-humor" data-target="intensidade-humor">Intensidade e humor</a>
+      <a href="#metas" data-target="metas">Metas</a>
+      <a href="#favoritas" data-target="favoritas">Favoritas</a>
+      <a href="#recentes" data-target="recentes">Recentes</a>
+      <a href="#artistas" data-target="artistas">Artistas</a>
+      <a href="#vertentes" data-target="vertentes">Vertentes</a>
+      <a href="#descobrir" data-target="descobrir">Descobrir</a>
+    </div>
+    <div class="rr-seg" role="group" aria-label="Período">
+      <button type="button" data-periodo="12" aria-pressed="true">12m</button>
+      <button type="button" data-periodo="6" aria-pressed="false">6m</button>
+      <button type="button" data-periodo="3" aria-pressed="false">3m</button>
+      <button type="button" data-periodo="1" aria-pressed="false">1m</button>
+    </div>
+  </nav>
+  <header class="rr-hero" id="topo">
+    <div class="rr-hero-text">
+      <span class="rr-eyebrow">Seu rock, em números</span>
+      <h1>Radar Sonoro</h1>
+      <div class="rr-seg" role="group" aria-label="Período">
+        <button type="button" data-periodo="12" aria-pressed="true">12 meses</button>
+        <button type="button" data-periodo="6" aria-pressed="false">6 meses</button>
+        <button type="button" data-periodo="3" aria-pressed="false">3 meses</button>
+        <button type="button" data-periodo="1" aria-pressed="false">Último mês</button>
+      </div>
+      <span class="rr-window">De <b data-draw="w-desde" data-source="resumo" data-field="desde">—</b> a <b data-draw="w-ate" data-source="resumo" data-field="ate">—</b></span>
+      <p class="rr-take">Você adicionou <b data-draw="t-faixas" data-source="resumo" data-field="faixas">—</b> faixas no período, e <b data-draw="t-rock" data-source="resumo" data-field="rock">—</b> delas são rock em alguma vertente. A energia mediana ficou em <b data-draw="t-energia" data-source="resumo" data-field="energia">—</b> numa escala de 0 a 1, com valência <b data-draw="t-valencia" data-source="resumo" data-field="valencia">—</b>: intenso, sem ser eufórico nem triste. As sugestões no fim da página puxam para as vertentes que você quer explorar.</p>
+      <span class="rr-badges-title">Seus selos neste período</span>
+      <div class="rr-badges" data-draw="selos" data-source="selos"></div>
+    </div>
+    <div class="rr-mosaic" data-draw="mosaico" data-source="top_albuns capas" aria-label="Álbuns que mais entraram no período"></div>
+  </header>
+
+  <section class="rr-stats" aria-label="Resumo do período" id="resumo">
+    <div class="rr-stat"><span>Faixas adicionadas</span><strong data-draw="k-faixas" data-source="resumo" data-field="faixas">—</strong><small>curtidas, álbuns e playlists suas</small></div>
+    <div class="rr-stat"><span>Artistas diferentes</span><strong data-draw="k-artistas" data-source="resumo" data-field="artistas">—</strong><small>pelo artista principal</small></div>
+    <div class="rr-stat"><span>Andamento mediano</span><strong data-draw="k-bpm" data-source="resumo" data-field="bpm">—</strong><small>batidas por minuto</small></div>
+    <div class="rr-stat"><span>Lançadas antes de 2000</span><strong data-draw="k-antes" data-source="resumo" data-field="antes2000">—</strong><small>a raiz clássica</small></div>
+  </section>
+
+
+  <section class="rr-section" id="intensidade-humor">
+    <div class="rr-sechead"><h2>Intensidade e humor</h2><span class="rr-note">Os dois termômetros do seu som. Cada faixa recebe uma nota de 0 a 1 em cada um; aqui está a mediana do período, calculada com as <b data-draw="k-cobertura" data-source="resumo" data-field="cobertura">—</b> das faixas que têm dados de áudio.</span></div>
+    <div class="rr-kpis">
+      <article class="rr-kpi" id="kpi-intensidade">
+        <div class="rr-kpi-top">
+          <div class="rr-kpi-name"><h3>Intensidade</h3><span>chamada de energia no Spotify</span></div>
+          <div class="rr-kpi-value"><strong data-draw="k-energia" data-source="resumo" data-field="energia">—</strong><em data-draw="v-energia" data-source="resumo" data-field="energia">—</em></div>
+        </div>
+        <div class="rr-scale" data-draw="s-energia" data-source="resumo"></div>
+        <span class="rr-delta">Em relação aos 12 meses: <b data-draw="d-energia" data-source="resumo" data-field="delta_energia">—</b></span>
+        <p class="rr-explain">Mede o quanto a faixa é <b>rápida, alta e cheia</b>: bateria forte, guitarra distorcida e vocal gritado puxam a nota para cima; violão e piano suaves puxam para baixo. <b>Até 0,40</b> é calmo, <b>de 0,40 a 0,70</b> é moderado e <b>acima de 0,70</b> é intenso.</p>
+        <div class="rr-ends" data-draw="e-energia" data-source="extremos capas"></div>
+      </article>
+      <article class="rr-kpi" id="kpi-humor">
+        <div class="rr-kpi-top">
+          <div class="rr-kpi-name"><h3>Humor</h3><span>chamado de valência no Spotify</span></div>
+          <div class="rr-kpi-value"><strong data-draw="k-valencia" data-source="resumo" data-field="valencia">—</strong><em data-draw="v-valencia" data-source="resumo" data-field="valencia">—</em></div>
+        </div>
+        <div class="rr-scale" data-draw="s-valencia" data-source="resumo"></div>
+        <span class="rr-delta">Em relação aos 12 meses: <b data-draw="d-valencia" data-source="resumo" data-field="delta_valencia">—</b></span>
+        <p class="rr-explain">Mede o quanto a faixa <b>soa positiva</b>. Nota alta é alegre, eufórica, de festa; nota baixa é triste, tensa ou raivosa. Não depende da letra, só do som. <b>Até 0,35</b> é sombrio, <b>de 0,35 a 0,65</b> é neutro e <b>acima de 0,65</b> é alegre.</p>
+        <div class="rr-ends" data-draw="e-valencia" data-source="extremos capas"></div>
+      </article>
+    </div>
+    <div class="rr-card" id="mapa-humor">
+      <h3>Seu mapa de humor</h3>
+      <p class="rr-note">Juntando as duas notas, cada faixa cai em um de quatro quadrantes. O de borda escura é onde está a maior parte do período; a capa é a faixa mais extrema de cada um.</p>
+      <div class="rr-quad" data-draw="quad" data-source="quadrantes capas"></div>
+    </div>
+  </section>
+
+  <section class="rr-section" id="metas">
+    <div class="rr-sechead"><h2>Metas</h2><span class="rr-note">Calculadas para o período escolhido. A meta cresce com o tamanho do período.</span></div>
+    <div class="rr-goals">
+      <article class="rr-goal" id="meta-novos">
+        <h3>Artistas novos</h3>
+        <div class="ring" data-draw="g-novos" data-source="metas"></div>
+        <span class="state" data-draw="gs-novos" data-source="metas">—</span>
+        <p>Artistas que entraram pela primeira vez na sua biblioteca. Meta: 6 por mês.</p>
+      </article>
+      <article class="rr-goal" id="meta-alvo">
+        <h3>Explorar o que você quer</h3>
+        <div class="ring" data-draw="g-alvo" data-source="metas"></div>
+        <span class="state" data-draw="gs-alvo" data-source="metas">—</span>
+        <p>Parte das faixas em nu metal, emo, J-Rock ou hard rock e clássicos. Meta: 25%.</p>
+      </article>
+      <article class="rr-goal" id="meta-horas">
+        <h3>Horas de música nova</h3>
+        <div class="ring" data-draw="g-horas" data-source="metas"></div>
+        <span class="state" data-draw="gs-horas" data-source="metas">—</span>
+        <p>Duração somada das faixas que você adicionou. Não é tempo escutado. Meta: 2 horas por mês.</p>
+      </article>
+      <article class="rr-goal" id="meta-minutos">
+        <h3>Minutos escutados</h3>
+        <div class="ring" data-draw="g-minutos" data-source="escuta"></div>
+        <span class="state" data-draw="gs-minutos" data-source="escuta">—</span>
+        <p>Contados desde <b data-draw="w-escuta" data-source="escuta">—</b>, quando o registro começou. Meta: 1.200 minutos por mês (40 por dia).</p>
+      </article>
+      <article class="rr-goal" id="meta-plays">
+        <h3>Faixas reproduzidas</h3>
+        <div class="ring" data-draw="g-plays" data-source="escuta"></div>
+        <span class="state" data-draw="gs-plays" data-source="escuta">—</span>
+        <p>Cada faixa tocada até o fim ou pulada conta uma vez. Meta: 400 por mês.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="rr-section" id="favoritas">
+    <div class="rr-sechead"><h2>No seu Spotify agora</h2><span class="rr-note">Suas mais ouvidas das últimas 4 semanas, segundo o Spotify, na última sincronização. Não muda com o filtro de período.</span></div>
+    <div class="rr-fav">
+      <article class="rr-favcard" id="faixa-favorita">
+        <div class="rr-favlist" data-draw="fav-faixas" data-source="mais_ouvidas capas"></div>
+      </article>
+      <article class="rr-favcard" id="banda-favorita">
+        <div class="rr-favlist" data-draw="fav-artistas" data-source="artistas_mais_ouvidos capas"></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="rr-section" id="recentes">
+    <div class="rr-sechead"><h2>Adicionadas por último</h2><span class="rr-note">As 12 mais recentes do período. Toque na capa para abrir no Spotify.</span></div>
+    <div class="rr-rail" data-draw="rail" data-source="recentes capas"></div>
+  </section>
+
+  <section class="rr-section" id="artistas">
+    <div class="rr-sechead"><h2>Quem mais entrou</h2><span class="rr-note">Artistas com mais faixas no período. Um álbum salvo conta todas as faixas dele.</span></div>
+    <div class="rr-artists" data-draw="artistas" data-source="top_artistas capas"></div>
+  </section>
+
+  <section class="rr-section" id="vertentes">
+    <div class="rr-sechead"><h2>Vertentes e som</h2></div>
+    <div class="rr-grid">
+      <div class="rr-card" id="peso">
+        <h3>Peso de cada vertente</h3>
+        <p class="rr-note">Parte das faixas do período em cada vertente, com a energia mediana ao lado.</p>
+        <div class="rr-chart" data-draw="c-fam" data-source="por_familia"></div>
+      </div>
+      <div class="rr-card" id="mapa">
+        <h3>Energia × valência</h3>
+        <p class="rr-note">Cada ponto é uma faixa do período. Mais alto é mais intenso; mais à direita, mais alegre. Passe o cursor para ver a capa.</p>
+        <div class="rr-chart tall" data-draw="c-scatter" data-source="janelas capas"></div>
+      </div>
+    </div>
+    <div class="rr-grid">
+      <div class="rr-card" id="meses">
+        <h3>Faixas por mês</h3>
+        <p class="rr-note">Os 12 meses inteiros, com o período escolhido em destaque.</p>
+        <div class="rr-chart" data-draw="c-mes" data-source="por_mes resumo"></div>
+        <ul class="rr-legend" aria-label="Vertentes">
+          <li data-fam="Rock brasileiro"><i></i>Rock brasileiro</li>
+          <li data-fam="Punk e pop-punk"><i></i>Punk e pop-punk</li>
+          <li data-fam="Rock alternativo"><i></i>Rock alternativo</li>
+          <li data-fam="Nu metal e metalcore"><i></i>Nu metal e metalcore</li>
+          <li data-fam="Emo"><i></i>Emo</li>
+          <li data-fam="Hard rock e clássicos"><i></i>Hard rock e clássicos</li>
+          <li data-fam="J-Rock e anime"><i></i>J-Rock e anime</li>
+          <li data-fam="outros"><i></i>Trilhas, MPB e pop</li>
+        </ul>
+      </div>
+      <div class="rr-card" id="perfil">
+        <h3>Perfil de áudio por vertente</h3>
+        <p class="rr-note">Medianas das características de áudio do Spotify no período.</p>
+        <div class="rr-tablebox">
+          <table class="rr-table" data-source="por_familia" data-row-key="periodo,familia">
+            <thead><tr><th data-field="familia">Vertente</th><th data-field="faixas" class="num">Faixas</th><th data-field="energia" class="num">Energia</th><th data-field="valencia" class="num">Valência</th><th data-field="dancabilidade" class="num rr-hide-sm">Dança</th><th data-field="bpm" class="num">BPM</th></tr></thead>
+            <tbody data-draw="tb-fam"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="rr-card" id="decadas">
+        <h3>Década de lançamento</h3>
+        <p class="rr-note">Quando as faixas do período foram lançadas. Em destaque, o que é anterior a 2000.</p>
+        <div class="rr-chart" data-draw="c-dec" data-source="por_decada"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rr-section" id="descobrir">
+    <div class="rr-sechead"><h2>Para descobrir</h2></div>
+    <p class="rr-note">Artistas nas vertentes que você quer explorar. "Novo para você" quer dizer que o artista ainda não aparece nas suas curtidas, álbuns ou playlists; o status é refeito a cada sincronização. A ponte é quem você já ouve e leva até ele. Esta lista não muda com o período.</p>
+    <div class="rr-controls">
+      <div class="rr-chips" role="group" aria-label="Filtrar por estilo">
+        <button type="button" class="rr-chip" data-cat="" aria-pressed="true">Todos</button>
+        <button type="button" class="rr-chip" data-cat="Rock alternativo e hard rock" aria-pressed="false">Rock alternativo e hard rock</button>
+        <button type="button" class="rr-chip" data-cat="Nu metal e metalcore" aria-pressed="false">Nu metal e metalcore</button>
+        <button type="button" class="rr-chip" data-cat="Punk e pop-punk" aria-pressed="false">Punk e pop-punk</button>
+        <button type="button" class="rr-chip" data-cat="Emocore" aria-pressed="false">Emocore</button>
+        <button type="button" class="rr-chip" data-cat="J-Rock e anime" aria-pressed="false">J-Rock e anime</button>
+        <button type="button" class="rr-chip" data-cat="Clássicos 70, 80 e 90" aria-pressed="false">Clássicos 70, 80 e 90</button>
+      </div>
+      <label class="rr-toggle" for="rr-only-new"><input type="checkbox" id="rr-only-new"> Só quem é novo para você</label>
+    </div>
+    <div class="rr-recs" data-draw="recs" data-source="recomendacoes capas"></div>
+  </section>
+
+  <details>
+    <summary>Como estes números foram feitos</summary>
+    <dl>
+      <dt>Período</dt><dd>Contado para trás a partir de hoje. Entram músicas curtidas, álbuns salvos e faixas que você mesmo pôs nas suas playlists; cada faixa conta uma vez. Playlists automáticas do Spotify ficam de fora.</dd>
+      <dt>Deixado de fora</dt><dd>Rap do Djonga, Jamie Cullum e sertanejo, a seu pedido.</dd>
+      <dt>Vertentes</dt><dd>Agrupam os gêneros que o Spotify atribui a cada artista. <b data-draw="m-manual" data-source="resumo" data-field="manual">—</b> faixas do período são de artistas independentes sem gênero no Spotify, classificados à mão; os que ainda não estão na lista aparecem como "Sem gênero".</dd>
+      <dt>Áudio</dt><dd>Energia, valência, dançabilidade e andamento vêm do ReccoBeats, que tem os mesmos números que o Spotify fornecia, mas não tem todas as faixas. As faixas de corte (0,40 e 0,70 para intensidade; 0,35 e 0,65 para humor; 0,50 nos quadrantes) são escolhas para facilitar a leitura.</dd>
+      <dt>Escuta</dt><dd>O Spotify só mostra as últimas 50 faixas tocadas. O servidor guarda essa lista a cada 30 minutos, então minutos e reproduções contam a partir do dia em que o registro começou, e cada faixa conta pela duração inteira.</dd>
+      <dt>Metas</dt><dd>Artista novo é o que aparece pela primeira vez na sua biblioteca dentro do período. Os valores das metas são sugestões e podem ser ajustados.</dd>
+    </dl>
+  </details>
+</div>
+
+<script>
+  const FAMS = ['Rock brasileiro','Punk e pop-punk','Rock alternativo','Nu metal e metalcore','Emo','Hard rock e clássicos','J-Rock e anime','Trilhas e instrumental','MPB e outros brasileiros','Pop'];
+  const ROCK = FAMS.slice(0, 7);
+  window.rr = window.rr || {};
+  window.rr.ROCK = ROCK;
+  window.rr.color = (f) => { const i = ROCK.indexOf(f); return i >= 0 ? dash.colors[i % dash.colors.length] : 'var(--cds-chart-muted)'; };
+  d3.formatDefaultLocale({decimal: ',', thousands: '.', grouping: [3], currency: ['R$', '']});
+  window.rr.dec2 = d3.format('.2f');
+  window.rr.pct = d3.format('.0%');
+  window.rr.int = d3.format(',');
+  const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  window.rr.mes = (k) => { const [y, m] = k.split('-'); return MESES[Number(m) - 1] + '/' + y.slice(2); };
+  window.rr.dia = (k) => { const [y, m, d] = k.split('-'); return Number(d) + '/' + MESES[Number(m) - 1] + '/' + y; };
+  window.rr.periodo = () => String(dash.params().periodo || '12');
+
+  dash.calc('janelas', {
+    title: 'Faixas por período',
+    description: 'Cada faixa repetida em cada período que a contém (12, 6, 3 e 1 mês antes de hoje).',
+    inputs: ['faixas', 'meta'],
+    fn: (faixas, meta) => {
+      const last = meta[0].agora;
+      const [y, m, d] = last.split('-').map(Number);
+      const cut = (n) => new Date(Date.UTC(y, m - 1 - n, Math.min(d, 28))).toISOString().slice(0, 10);
+      return [12, 6, 3, 1].flatMap((n) => faixas.filter((r) => r.data > cut(n)).map((r) => ({...r, periodo: String(n), desde: cut(n), ate: last})));
+    },
+  });
+
+  dash.calc('resumo', {
+    title: 'Resumo por período',
+    description: 'Totais e medianas de áudio das faixas de cada período.',
+    inputs: ['janelas'],
+    fn: (janelas) => {
+      const rock = ['Rock brasileiro','Punk e pop-punk','Rock alternativo','Nu metal e metalcore','Emo','Hard rock e clássicos','J-Rock e anime'];
+      const med = (a) => { a = a.filter((x) => !isNaN(x)).sort((x, y) => x - y); const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+      const r2 = (x, k) => Math.round(x * 10 ** k) / 10 ** k;
+      return ['12', '6', '3', '1'].map((p) => {
+        const f = janelas.filter((r) => r.periodo === p);
+        const col = (k) => f.filter((r) => r[k] !== '').map((r) => Number(r[k]));
+        const any = janelas[0] || {};
+        const w = f[0] || {desde: '', ate: any.ate || ''};
+        return {
+          periodo: p, desde: w.desde, ate: w.ate, faixas: f.length, cobertura: f.length ? r2(col('energia').length / f.length, 3) : 0,
+          artistas: new Set(f.map((r) => r.artista.split(', ')[0])).size,
+          energia: r2(med(col('energia')), 2), valencia: r2(med(col('valencia')), 2), bpm: Math.round(med(col('bpm'))),
+          rock: r2(f.filter((r) => rock.includes(r.familia)).length / f.length, 3),
+          antes2000: r2(f.filter((r) => r.lancamento !== '' && Number(r.lancamento) < 2000).length / f.length, 3),
+          manual: f.filter((r) => r.classificacao.startsWith('Manual')).length,
+        };
+      }).map((r, i, all) => ({...r, energia_base: all[0].energia, valencia_base: all[0].valencia,
+        delta_energia: Math.round((r.energia - all[0].energia) * 100) / 100, delta_valencia: Math.round((r.valencia - all[0].valencia) * 100) / 100}));
+    },
+  });
+
+  dash.calc('extremos', {
+    title: 'Faixas nos extremos de cada nota',
+    description: 'A faixa de menor e de maior energia e valência em cada período.',
+    inputs: ['janelas'],
+    fn: (janelas) => ['12', '6', '3', '1'].flatMap((p) => {
+      const f = janelas.filter((r) => r.periodo === p && r.energia !== '' && r.valencia !== '');
+      if (!f.length) return [];
+      return [['energia', 'min'], ['energia', 'max'], ['valencia', 'min'], ['valencia', 'max']].map(([k, w]) => {
+        const r = f.slice().sort((a, b) => (w === 'min' ? Number(a[k]) - Number(b[k]) : Number(b[k]) - Number(a[k])) || a.faixa.localeCompare(b.faixa))[0];
+        return {periodo: p, tipo: k + '_' + w, faixa: r.faixa, artista: r.artista, capa: r.capa, valor: Math.round(Number(r[k]) * 100) / 100, link: r.link};
+      });
+    }),
+  });
+
+  dash.calc('quadrantes', {
+    title: 'Mapa de humor por período',
+    description: 'Faixas em cada quadrante de energia e valência (corte em 0,5), com a faixa mais extrema de cada um.',
+    inputs: ['janelas'],
+    fn: (janelas) => ['12', '6', '3', '1'].flatMap((p) => {
+      const f = janelas.filter((r) => r.periodo === p && r.energia !== '' && r.valencia !== '');
+      const q = (r) => (Number(r.energia) >= 0.5 ? 'Intenso' : 'Calmo') + ' e ' + (Number(r.valencia) >= 0.5 ? (Number(r.energia) >= 0.5 ? 'alegre' : 'leve') : (Number(r.energia) >= 0.5 ? 'sombrio' : 'melancólico'));
+      return ['Intenso e sombrio', 'Intenso e alegre', 'Calmo e melancólico', 'Calmo e leve'].map((quadrante) => {
+        const rs = f.filter((r) => q(r) === quadrante);
+        const ex = rs.slice().sort((a, b) => (Math.abs(b.energia - 0.5) + Math.abs(b.valencia - 0.5)) - (Math.abs(a.energia - 0.5) + Math.abs(a.valencia - 0.5)))[0];
+        return {periodo: p, quadrante, faixas: rs.length, parte: f.length ? Math.round(rs.length / f.length * 1000) / 1000 : 0,
+          faixa: ex ? ex.faixa : '', artista: ex ? ex.artista : '', capa: ex ? ex.capa : ''};
+      });
+    }),
+  });
+
+  dash.calc('metas', {
+    title: 'Metas do período',
+    description: 'Artistas novos (meta de 6 por mês), parte das faixas nas vertentes que você quer explorar (meta de 25%) e horas de música nova (meta de 2 por mês).',
+    inputs: ['janelas'],
+    fn: (janelas) => ['12', '6', '3', '1'].map((p) => {
+      const f = janelas.filter((r) => r.periodo === p);
+      if (!f.length) return {periodo: p, novos_artistas: 0, meta_novos: 6 * Number(p), alvo_parte: 0, meta_alvo: 0.25, horas: 0, meta_horas: 2 * Number(p)};
+      const alvo = ['Nu metal e metalcore', 'Emo', 'J-Rock e anime', 'Hard rock e clássicos'];
+      const novos = new Set(f.filter((r) => r.artista_estreia > r.desde).map((r) => r.artista.split(', ')[0])).size;
+      const horas = Math.round(f.reduce((a, r) => a + Number(r.duracao_ms || 0), 0) / 36000) / 100;
+      return {periodo: p, novos_artistas: novos, meta_novos: 6 * Number(p),
+        alvo_parte: Math.round(f.filter((r) => alvo.includes(r.familia)).length / f.length * 1000) / 1000, meta_alvo: 0.25,
+        horas, meta_horas: 2 * Number(p)};
+    }),
+  });
+
+  dash.calc('escuta', {
+    title: 'Escuta registrada por período',
+    description: 'Minutos e faixas reproduzidas, a partir do registro que o servidor faz das suas últimas faixas tocadas. Metas: 1.200 minutos e 400 faixas por mês.',
+    inputs: ['plays', 'meta'],
+    fn: (plays, meta) => {
+      const [y, m, d] = meta[0].agora.split('-').map(Number);
+      const cut = (n) => new Date(Date.UTC(y, m - 1 - n, Math.min(d, 28))).toISOString().slice(0, 10);
+      return ['12', '6', '3', '1'].map((p) => {
+        const f = plays.filter((r) => r.data > cut(Number(p)));
+        return {periodo: p, minutos: Math.round(f.reduce((a, r) => a + Number(r.ms || 0), 0) / 60000), meta_minutos: 1200 * Number(p),
+          reproducoes: f.length, meta_reproducoes: 400 * Number(p), desde: meta[0].escuta_desde || ''};
+      });
+    },
+  });
+
+  dash.calc('selos', {
+    title: 'Selos do período',
+    description: 'Selos ganhos em cada período, pelas regras de humor, intensidade, volume, descoberta, época e vertente descritas em cada um.',
+    inputs: ['resumo', 'por_familia', 'metas', 'janelas'],
+    fn: (resumo, por_familia, metas, janelas) => ['12', '6', '3', '1'].flatMap((p) => {
+      const r = resumo.find((x) => x.periodo === p); const m = metas.find((x) => x.periodo === p);
+      const fam = por_familia.filter((x) => x.periodo === p); const f = janelas.filter((x) => x.periodo === p);
+      if (!f.length) return [];
+      const n = Number(p); const share = (k) => (fam.find((x) => x.familia === k) || {parte: 0}).parte;
+      const top = fam[0] || {parte: 0, familia: ''};
+      const ano = Number(r.ate.slice(0, 4));
+      const novas = f.filter((x) => x.lancamento !== '' && Number(x.lancamento) >= ano - 1).length / f.length;
+      const pops = f.filter((x) => x.popularidade !== '').map((x) => Number(x.popularidade)).sort((a, b) => a - b); const pop = pops.length ? pops[pops.length >> 1] : 100;
+      const artc = {}; f.forEach((x) => { const a = x.artista.split(', ')[0]; artc[a] = (artc[a] || 0) + 1; });
+      const [fa, fn1] = Object.entries(artc).sort((a, b) => b[1] - a[1])[0];
+      const e = r.energia, v = r.valencia, porMes = r.faixas / n, novosMes = m.novos_artistas / n;
+      const S = [
+        [e >= 0.7 && v <= 0.4, 'coracao', 'humor', 'Coração de pedra barulhento', 'Grita alto, mas por dentro chora.', 'Intensidade ≥ 0,70 e humor ≤ 0,40'],
+        [e >= 0.7 && v >= 0.6, 'euforia', 'humor', 'Euforia em alta voltagem', 'Seu fone vive em festa.', 'Intensidade ≥ 0,70 e humor ≥ 0,60'],
+        [e >= 0.7 && v > 0.4 && v < 0.6, 'equilibrista', 'humor', 'Equilibrista do caos', 'Intenso, sem perder a pose.', 'Intensidade ≥ 0,70 e humor entre 0,40 e 0,60'],
+        [e < 0.45 && v < 0.4, 'sofrencia', 'humor', 'Sofrência acústica', 'Chuva na janela, violão no colo.', 'Intensidade < 0,45 e humor < 0,40'],
+        [e < 0.45 && v >= 0.55, 'paz', 'humor', 'Paz de domingo', 'Rede, café e nada de distorção.', 'Intensidade < 0,45 e humor ≥ 0,55'],
+        [e >= 0.45 && e < 0.7 && v >= 0.4 && v < 0.6, 'morno', 'humor', 'Morno e confortável', 'Nem tanto ao mar, nem tanto à terra.', 'Intensidade e humor no meio da escala'],
+        [porMes >= 20, 'maquina', 'volume', 'Máquina de adicionar', Math.round(porMes) + ' faixas novas por mês.', '20 ou mais faixas adicionadas por mês'],
+        [porMes < 6, 'economico', 'volume', 'Modo econômico', 'Pouca coisa entrou, e está tudo bem.', 'Menos de 6 faixas adicionadas por mês'],
+        [novosMes >= 5, 'garimpeiro', 'descoberta', 'Garimpeiro de bandas', m.novos_artistas + ' artistas estrearam na sua biblioteca.', '5 ou mais artistas novos por mês'],
+        [novosMes < 1.5, 'fiel', 'descoberta', 'Fiel ao repertório', 'Em time que está ganhando não se mexe.', 'Menos de 1,5 artista novo por mês'],
+        [r.antes2000 >= 0.3, 'tempo', 'epoca', 'Máquina do tempo', 'Um terço do som é do século passado.', '30% ou mais das faixas lançadas antes de 2000'],
+        [novas >= 0.5, 'forno', 'epoca', 'Recém-saído do forno', 'Metade do que entrou acabou de sair.', '50% ou mais das faixas lançadas no último ano e meio'],
+        [top.parte >= 0.45, 'monogamo', 'genero', 'Monogâmico de gênero', 'Casado com ' + top.familia.toLowerCase() + '.', 'Uma vertente com 45% ou mais das faixas'],
+        [top.parte < 0.3 && fam.length >= 5, 'camaleao', 'genero', 'Camaleão sonoro', fam.length + ' vertentes, nenhuma manda.', 'Maior vertente abaixo de 30%, com 5 ou mais vertentes'],
+        [share('Rock brasileiro') + share('MPB e outros brasileiros') >= 0.3, 'raiz', 'genero', 'Raiz brasileira', 'O rock daqui pesa na sua mala.', 'Rock brasileiro e MPB somam 30% ou mais'],
+        [share('J-Rock e anime') >= 0.08, 'otaku', 'genero', 'Otaku rocker', 'Abertura de anime no repeat.', 'J-Rock e anime com 8% ou mais'],
+        [share('Nu metal e metalcore') >= 0.12, 'moshpit', 'genero', 'Moshpit certificado', 'Abram a roda.', 'Nu metal e metalcore com 12% ou mais'],
+        [share('Punk e pop-punk') >= 0.2, 'punk', 'genero', 'Punk de carteirinha', 'Três acordes e muita atitude.', 'Punk e pop-punk com 20% ou mais'],
+        [r.bpm >= 125, 'acelerador', 'ritmo', 'Pé no acelerador', r.bpm + ' BPM de mediana.', 'Andamento mediano de 125 BPM ou mais'],
+        [fn1 / f.length >= 0.12 && f.length >= 10, 'fa', 'fa', 'Fã número 1', fa + ' domina o período.', 'Um artista com 12% ou mais das faixas'],
+        [pop <= 30, 'ladob', 'descoberta', 'Cavador de lado B', 'Você ouve o que o algoritmo esconde.', 'Popularidade mediana de 30 ou menos'],
+      ];
+      return S.filter((x) => x[0]).map((x, i) => ({periodo: p, ordem: i + 1, selo: x[1], tipo: x[2], titulo: x[3], frase: x[4], regra: x[5]}));
+    }),
+  });
+
+
+  dash.calc('por_familia', {
+    title: 'Vertentes por período',
+    description: 'Faixas, parte do total e medianas de áudio por vertente, em cada período.',
+    inputs: ['janelas'],
+    fn: (janelas) => {
+      const med = (a) => { a = a.filter((x) => !isNaN(x)).sort((x, y) => x - y); const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const out = [];
+      ['12', '6', '3', '1'].forEach((p) => {
+        const f = janelas.filter((r) => r.periodo === p);
+        const g = new Map();
+        f.forEach((r) => { if (!g.has(r.familia)) g.set(r.familia, []); g.get(r.familia).push(r); });
+        const col = (rs, k) => rs.filter((r) => r[k] !== '').map((r) => Number(r[k]));
+        [...g].map(([familia, rs]) => ({
+          periodo: p, familia, faixas: rs.length, parte: Math.round(rs.length / f.length * 1000) / 1000,
+          energia: r2(med(col(rs, 'energia'))), valencia: r2(med(col(rs, 'valencia'))),
+          dancabilidade: r2(med(col(rs, 'dancabilidade'))), bpm: Math.round(med(col(rs, 'bpm'))),
+        })).sort((a, b) => b.faixas - a.faixas).forEach((x) => out.push(x));
+      });
+      return out;
+    },
+  });
+
+  dash.calc('por_decada', {
+    title: 'Década de lançamento por período',
+    description: 'Faixas de cada período pela década em que foram lançadas.',
+    inputs: ['janelas'],
+    fn: (janelas) => {
+      const c = new Map();
+      janelas.filter((r) => r.lancamento !== '').forEach((r) => { const k = r.periodo + '|' + Math.floor(Number(r.lancamento) / 10) * 10; c.set(k, (c.get(k) || 0) + 1); });
+      return [...c].map(([k, n]) => { const [periodo, d] = k.split('|'); return {periodo, decada: d + 's', faixas: n}; })
+        .sort((a, b) => Number(b.periodo) - Number(a.periodo) || a.decada.localeCompare(b.decada));
+    },
+  });
+
+  dash.calc('top_artistas', {
+    title: 'Artistas com mais faixas por período',
+    description: 'Os 9 artistas principais com mais faixas em cada período, com o álbum que mais entrou de cada um.',
+    inputs: ['janelas'],
+    fn: (janelas) => {
+      const top = (rs, k) => { const c = {}; rs.forEach((r) => { c[r[k]] = (c[r[k]] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0][0]; };
+      return ['12', '6', '3', '1'].flatMap((p) => {
+        const g = new Map();
+        janelas.filter((r) => r.periodo === p).forEach((r) => { const a = r.artista.split(', ')[0]; if (!g.has(a)) g.set(a, []); g.get(a).push(r); });
+        return [...g].map(([artista, rs]) => ({periodo: p, artista, faixas: rs.length, familia: top(rs, 'familia'), capa: top(rs, 'capa')}))
+          .sort((a, b) => b.faixas - a.faixas || a.artista.localeCompare(b.artista)).slice(0, 9);
+      });
+    },
+  });
+
+  dash.calc('top_albuns', {
+    title: 'Álbuns que mais entraram por período',
+    description: 'As 7 capas com mais faixas adicionadas em cada período.',
+    inputs: ['janelas'],
+    fn: (janelas) => ['12', '6', '3', '1'].flatMap((p) => {
+      const c = new Map();
+      janelas.filter((r) => r.periodo === p).forEach((r) => c.set(r.capa, (c.get(r.capa) || 0) + 1));
+      return [...c].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 7).map(([capa, faixas]) => ({periodo: p, capa, faixas}));
+    }),
+  });
+
+  dash.calc('recentes', {
+    title: 'Adicionadas por último',
+    description: 'As 12 faixas mais recentes de cada período.',
+    inputs: ['janelas'],
+    fn: (janelas) => ['12', '6', '3', '1'].flatMap((p) => janelas.filter((r) => r.periodo === p)
+      .sort((a, b) => b.data.localeCompare(a.data) || a.faixa.localeCompare(b.faixa)).slice(0, 12)
+      .map((r) => ({periodo: p, faixa: r.faixa, artista: r.artista, capa: r.capa, familia: r.familia, data: r.data, link: r.link}))),
+  });
+
+  dash.calc('por_mes', {
+    title: 'Faixas por mês e vertente',
+    description: 'Quantas faixas entraram em cada mês, por vertente; meses sem nenhuma aparecem com zero.',
+    inputs: ['faixas'],
+    fn: (faixas) => {
+      const c = {};
+      faixas.forEach((r) => { c[r.mes] = c[r.mes] || {}; c[r.mes][r.familia] = (c[r.mes][r.familia] || 0) + 1; });
+      const ms = Object.keys(c).sort();
+      let [y, m] = ms[0].split('-').map(Number);
+      const [ly, lm] = ms[ms.length - 1].split('-').map(Number);
+      const out = [];
+      while (y < ly || (y === ly && m <= lm)) {
+        const k = y + '-' + String(m).padStart(2, '0');
+        const v = c[k] || {};
+        out.push({mes: k, total: Object.values(v).reduce((a, b) => a + b, 0), ...v});
+        m += 1; if (m > 12) { m = 1; y += 1; }
+      }
+      return out;
+    },
+  });
+
+  document.querySelectorAll('.rr-legend li').forEach((li) => {
+    const f = li.getAttribute('data-fam');
+    li.querySelectorAll('i').forEach((i) => { i.style.background = window.rr.color(f); });
+  });
+  document.querySelectorAll('.rr-seg button').forEach((b) => {
+    b.addEventListener('click', () => dash.setParams({periodo: b.getAttribute('data-periodo')}));
+  });
+  dash.onData(() => {
+    const p = window.rr.periodo();
+    document.querySelectorAll('.rr-seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.getAttribute('data-periodo') === p)));
+  });
+  window.rr.cat = '';
+  window.rr.onlyNew = false;
+  document.querySelectorAll('.rr-chip').forEach((b) => {
+    b.addEventListener('click', () => {
+      window.rr.cat = b.getAttribute('data-cat');
+      document.querySelectorAll('.rr-chip').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+      dash.draw('recs');
+    });
+  });
+  document.querySelectorAll('#rr-only-new').forEach((c) => {
+    c.addEventListener('change', () => { window.rr.onlyNew = c.checked; dash.draw('recs'); });
+  });
+</script>
+
+<script>
+  const R = window.rr;
+  document.querySelectorAll('.rr-nav a[data-target]').forEach((a) => {
+    a.addEventListener('click', (ev) => {
+      const t = document.getElementById(a.getAttribute('data-target'));
+      if (!t) return;
+      ev.preventDefault();
+      t.scrollIntoView({behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start'});
+      dash.setLink(t.id);
+    });
+  });
+  const navSpy = () => {
+    const links = [...document.querySelectorAll('.rr-nav a[data-target]')];
+    let cur = links.length ? links[0].getAttribute('data-target') : '';
+    links.forEach((a) => { const t = document.getElementById(a.getAttribute('data-target')); if (t && t.getBoundingClientRect().top < 140) cur = a.getAttribute('data-target'); });
+    links.forEach((a) => {
+      const on = a.getAttribute('data-target') === cur;
+      if (on !== (a.getAttribute('aria-current') === 'true')) {
+        a.setAttribute('aria-current', String(on));
+        if (on) a.scrollIntoView({block: 'nearest', inline: 'nearest'});
+      }
+    });
+  };
+  window.addEventListener('scroll', navSpy, {passive: true, capture: true});
+  navSpy();
+  const linked = document.getElementById(location.hash.slice(1));
+  if (linked) setTimeout(() => linked.scrollIntoView(), 400);
+
+  const BADGE_HUE = {humor: 0, volume: 1, descoberta: 2, epoca: 5, genero: 3, ritmo: 4, fa: 6};
+  const ICON = {
+    coracao: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z M12 7.4l-1.6 4 2.4 1-1.4 3.6',
+    euforia: 'M13 2 5 13h6l-1 9 8-11h-6z',
+    equilibrista: 'M3 12h18 M12 4v16 M7 8l-4 4 4 4 M17 8l4 4-4 4',
+    sofrencia: 'M18 14a6 6 0 1 1-6-8 5 5 0 0 0 6 8z M8 18l-1 3 M12 19l-1 3 M16 18l-1 3',
+    paz: 'M12 3v2 M12 19v2 M3 12h2 M19 12h2 M5.6 5.6l1.4 1.4 M17 17l1.4 1.4 M5.6 18.4 7 17 M17 7l1.4-1.4 M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z',
+    morno: 'M8 3v11a3 3 0 1 0 4 0V3z M10 9h0 M14 5h4 M14 9h3 M14 13h4',
+    maquina: 'M4 6h16v4H4z M4 14h16v4H4z M8 10v4 M16 10v4',
+    economico: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 7v5l3 2',
+    garimpeiro: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M15.5 8.5 13 13l-4.5 2.5L11 11z',
+    fiel: 'M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11z',
+    tempo: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 3a4 9 0 1 0 0 18 M3 12h18',
+    forno: 'M12 2c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 3 3 5',
+    monogamo: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10z M12 11a1 1 0 1 0 0 2a1 1 0 1 0 0-2z',
+    camaleao: 'M4 12a8 8 0 0 1 16 0c0 3-3 3-4 2s-3 1-3 3-2 3-4 2a8 8 0 0 1-5-7z M8 10h0 M12 8h0 M16 10h0',
+    raiz: 'M12 21V11 M12 11c0-4 3-7 7-7 0 4-3 7-7 7z M12 14c0-3-2-5-6-5 0 3 2 5 6 5z',
+    otaku: 'M4 7h16 M6 7v13 M18 7v13 M3 4c6 2 12 2 18 0 M9 11h6',
+    moshpit: 'M12 2l2.4 6.5L21 9l-5 4.4L17.5 21 12 17l-5.5 4L8 13.4 3 9l6.6-.5z',
+    punk: 'M6 3l12 18 M18 3 6 21 M4 12h16',
+    acelerador: 'M4 18a8 8 0 1 1 16 0 M12 18l5-7 M6 18h0 M18 18h0',
+    fa: 'M3 8l4 4 5-7 5 7 4-4-2 11H5z',
+    ladob: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z M19 19l3 3',
+  };
+  const SHAPE = {
+    humor: 'M50 4 90 27v46L50 96 10 73V27z',
+    volume: 'M50 4l12 9 15-2 4 14 13 8-6 14 6 14-13 8-4 14-15-2-12 9-12-9-15 2-4-14-13-8 6-14-6-14 13-8 4-14 15 2z',
+    descoberta: 'M50 4c18 0 34 6 40 10v30c0 26-20 44-40 52C30 88 10 70 10 44V14c6-4 22-10 40-10z',
+    epoca: 'M50 4a46 46 0 1 1 0 92a46 46 0 1 1 0-92z',
+    genero: 'M22 6h56l16 16v56L78 94H22L6 78V22z',
+    ritmo: 'M50 4 61 36h34L67 56l11 34-28-21-28 21 11-34L5 36h34z',
+    fa: 'M50 4a46 46 0 1 1 0 92a46 46 0 1 1 0-92z',
+  };
+  dash.draw('selos', (e) => {
+    const rows = ok('selos');
+    if (!rows) return fail(e, 'selos');
+    e.replaceChildren();
+    const list = forP(rows);
+    if (!list.length) { e.append(el('span', 'rr-empty', 'Nenhum selo neste período.')); return; }
+    const NS = 'http://www.w3.org/2000/svg';
+    list.forEach((b, i) => {
+      const color = dash.colors[(BADGE_HUE[b.tipo] || 0) % dash.colors.length];
+      const wrap = el('div', 'rr-badge' + (i === 0 ? ' main' : ''));
+      wrap.title = 'Regra: ' + b.regra;
+      const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('viewBox', '0 0 100 100'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', b.titulo);
+      svg.style.animationDelay = (i * 70) + 'ms';
+      const mk = (tag, attrs) => { const n = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v)); svg.append(n); return n; };
+      const gid = 'rrg' + i + b.selo;
+      const defs = mk('defs', {}); const lg = document.createElementNS(NS, 'linearGradient'); lg.setAttribute('id', gid); lg.setAttribute('x1', '0'); lg.setAttribute('y1', '0'); lg.setAttribute('x2', '0'); lg.setAttribute('y2', '1');
+      [['0', 1], ['1', 0.72]].forEach(([o, op]) => { const st = document.createElementNS(NS, 'stop'); st.setAttribute('offset', o); st.setAttribute('style', `stop-color:${color};stop-opacity:${op}`); lg.append(st); });
+      defs.append(lg);
+      const shape = SHAPE[b.tipo] || SHAPE.epoca;
+      mk('path', {d: shape, fill: `url(#${gid})`});
+      mk('path', {d: shape, fill: 'none', stroke: 'var(--color-bg)', 'stroke-width': '3', transform: 'translate(50 50) scale(.86) translate(-50 -50)', opacity: '.55'});
+      mk('path', {d: 'M22 30c8-10 20-15 28-15', fill: 'none', stroke: 'white', 'stroke-width': '4', 'stroke-linecap': 'round', opacity: '.35'});
+      const g = mk('g', {transform: 'translate(29 27) scale(1.75)', fill: 'none', stroke: 'white', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round'});
+      const ic = document.createElementNS(NS, 'path'); ic.setAttribute('d', ICON[b.selo] || ICON.moshpit); g.append(ic);
+      wrap.append(svg, el('b', null, b.titulo), el('span', null, b.frase));
+      e.append(wrap);
+    });
+  });
+  const ok = (id) => { const d = dash.data(id); return d.status === 'ok' ? d.data : null; };
+  const fail = (el, id) => {
+    el.replaceChildren();
+    if (dash.data(id).status === 'error') { const p = document.createElement('div'); p.className = 'rr-fail'; p.textContent = 'Failed to load'; el.append(p); }
+    else el.textContent = '—';
+  };
+  const forP = (rows) => rows.filter((r) => r.periodo === R.periodo());
+  const where = (el) => el.setAttribute('data-where', 'periodo=' + R.periodo());
+  const capaMap = () => { const c = ok('capas'); const m = new Map(); (c || []).forEach((r) => m.set(r.tipo + '|' + r.chave, r.img)); return m; };
+  const img = (src, alt) => {
+    if (!src) { const d = document.createElement('span'); d.className = 'ph'; return d; }
+    const i = document.createElement('img'); i.src = src; i.alt = alt; i.loading = 'lazy'; return i;
+  };
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const textW = (svg, s) => { const n = svg.append('text').text(s); const w = n.node().getComputedTextLength(); n.remove(); return w; };
+
+  const stat = (name, field, fmt) => dash.draw(name, (e) => {
+    where(e);
+    const d = ok('resumo');
+    e.textContent = d ? fmt(forP(d)[0][field]) : '—';
+  });
+  stat('w-desde', 'desde', R.dia); stat('w-ate', 'ate', R.dia);
+  stat('t-faixas', 'faixas', R.int); stat('k-faixas', 'faixas', R.int);
+  stat('t-rock', 'rock', R.pct); stat('t-energia', 'energia', R.dec2); stat('t-valencia', 'valencia', R.dec2);
+  stat('k-artistas', 'artistas', R.int); stat('k-energia', 'energia', R.dec2); stat('k-valencia', 'valencia', R.dec2);
+  const sign = (v) => (v > 0 ? '+' : v < 0 ? '−' : '±') + R.dec2(Math.abs(v)) + (v > 0 ? ' (mais alto)' : v < 0 ? ' (mais baixo)' : ' (igual)');
+  stat('d-energia', 'delta_energia', sign); stat('d-valencia', 'delta_valencia', sign);
+  const ZONES = {energia: [[0, 0.4, 'Calmo'], [0.4, 0.7, 'Moderado'], [0.7, 1, 'Intenso']], valencia: [[0, 0.35, 'Sombrio'], [0.35, 0.65, 'Neutro'], [0.65, 1, 'Alegre']]};
+  const zone = (k, v) => ZONES[k].find((z) => v < z[1] || z[1] === 1)[2];
+  stat('v-energia', 'energia', (v) => zone('energia', v)); stat('v-valencia', 'valencia', (v) => zone('valencia', v));
+  const scale = (name, k) => dash.draw(name, (e) => {
+    where(e);
+    const d = ok('resumo');
+    if (!d) return fail(e, 'resumo');
+    e.replaceChildren();
+    const row = forP(d)[0]; const v = row[k]; const base = row[k + '_base'];
+    const W = Math.max(260, e.clientWidth), H = 64, y0 = 24, bh = 12;
+    const svg = d3.select(e).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const x = d3.scaleLinear([0, 1], [6, W - 6]);
+    const ramp = ['var(--cds-chart-grid)', 'var(--cds-chart-muted)', 'var(--color-fg-muted)'];
+    ZONES[k].forEach((z, i) => {
+      svg.append('rect').attr('x', x(z[0]) + (i ? 1 : 0)).attr('width', x(z[1]) - x(z[0]) - (i ? 1 : 0)).attr('y', y0).attr('height', bh).attr('rx', 3).attr('fill', ramp[i]).attr('opacity', zone(k, v) === z[2] ? 1 : 0.55);
+      svg.append('text').attr('x', (x(z[0]) + x(z[1])) / 2).attr('y', y0 + bh + 16).attr('text-anchor', 'middle').attr('class', zone(k, v) === z[2] ? 'lbl' : null).text(z[2]);
+    });
+    [0, 1].forEach((t) => svg.append('text').attr('x', x(t)).attr('y', y0 - 8).attr('text-anchor', t ? 'end' : 'start').text(t));
+    if (Number(R.periodo()) !== 12) svg.append('line').attr('x1', x(base)).attr('x2', x(base)).attr('y1', y0 - 4).attr('y2', y0 + bh + 4).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-width', 2).attr('stroke-dasharray', '3 2');
+    svg.append('path').attr('d', `M${x(v)},${y0 - 2} l-7,-10 h14 z`).attr('fill', 'var(--color-fg)');
+    svg.append('rect').attr('x', x(v) - 1.5).attr('width', 3).attr('y', y0 - 2).attr('height', bh + 4).attr('rx', 1.5).attr('fill', 'var(--color-fg)');
+  });
+  scale('s-energia', 'energia'); scale('s-valencia', 'valencia');
+  const ends = (name, k, lo, hi) => dash.draw(name, (e) => {
+    const rows = ok('extremos'); const cm = capaMap();
+    if (!rows) return fail(e, 'extremos');
+    e.replaceChildren();
+    forP(rows).filter((r) => r.tipo.startsWith(k)).sort((a, b) => b.tipo.localeCompare(a.tipo)).forEach((r) => {
+      const a = el('a', 'rr-end'); a.href = r.link; a.target = '_blank'; a.rel = 'noopener';
+      const t = el('div');
+      t.append(el('small', null, (r.tipo.endsWith('max') ? hi : lo) + ' · ' + R.dec2(r.valor)), el('b', null, r.faixa), el('small', null, r.artista));
+      a.append(img(cm.get('album|' + r.capa), r.capa), t);
+      e.append(a);
+    });
+  });
+  ends('e-energia', 'energia', 'A mais calma', 'A mais intensa'); ends('e-valencia', 'valencia', 'A mais sombria', 'A mais alegre');
+
+  dash.draw('quad', (e) => {
+    const rows = ok('quadrantes'); const cm = capaMap();
+    if (!rows) return fail(e, 'quadrantes');
+    e.replaceChildren();
+    const f = forP(rows); const max = Math.max(...f.map((r) => r.faixas));
+    const DESC = {'Intenso e sombrio': 'raiva, tensão, catarse', 'Intenso e alegre': 'euforia, festa, empolgação', 'Calmo e melancólico': 'tristeza, saudade, introspecção', 'Calmo e leve': 'relaxado, tranquilo, aconchego'};
+    e.append(el('div', 'axis-y', 'intensidade ↑'));
+    f.forEach((r) => {
+      const c = el('div', 'rr-cell' + (r.faixas === max && max > 0 ? ' top' : ''));
+      const fill = el('span', 'fill'); fill.style.height = Math.round(r.parte * 100) + '%';
+      const t = el('div', 'txt');
+      t.append(el('strong', null, R.pct(r.parte)), el('b', null, r.quadrante), el('span', null, DESC[r.quadrante]), el('span', null, R.int(r.faixas) + ' faixas' + (r.faixa ? ' · ex.: ' + r.faixa : '')));
+      c.append(fill, t, img(r.capa ? cm.get('album|' + r.capa) : '', r.faixa));
+      e.append(c);
+    });
+    e.append(el('div', 'axis-x', 'humor →'));
+  });
+
+  const ring = (name, cur, goal, fmt, unit, src = 'metas') => dash.draw(name, (e) => {
+    where(e);
+    const d = ok(src);
+    if (!d) return fail(e, src);
+    e.replaceChildren();
+    const r = forP(d)[0]; const pct = r[goal] ? Math.max(0, r[cur] / r[goal]) : 0;
+    const S = 112, rad = 46, w = 10, C = 2 * Math.PI * rad;
+    const svg = d3.select(e).append('svg').attr('width', S).attr('height', S).attr('viewBox', `0 0 ${S} ${S}`);
+    svg.append('circle').attr('cx', S / 2).attr('cy', S / 2).attr('r', rad).attr('fill', 'none').attr('stroke', 'var(--cds-chart-grid)').attr('stroke-width', w);
+    svg.append('circle').attr('cx', S / 2).attr('cy', S / 2).attr('r', rad).attr('fill', 'none')
+      .attr('stroke', pct >= 1 ? 'var(--color-ok)' : 'var(--color-fg)').attr('stroke-width', w).attr('stroke-linecap', 'round')
+      .attr('stroke-dasharray', `${C * Math.min(1, pct)} ${C}`).attr('transform', `rotate(-90 ${S / 2} ${S / 2})`);
+    const c = el('div', 'c'); c.append(el('strong', null, fmt(r[cur])), el('span', null, 'de ' + fmt(r[goal]) + unit)); e.append(c);
+  });
+  ring('g-novos', 'novos_artistas', 'meta_novos', R.int, '');
+  ring('g-alvo', 'alvo_parte', 'meta_alvo', R.pct, '');
+  ring('g-horas', 'horas', 'meta_horas', (v) => d3.format('.1f')(v).replace(',0', ''), ' h');
+  const gstate = (name, cur, goal, src = 'metas') => dash.draw(name, (e) => {
+    where(e);
+    const d = ok(src);
+    if (!d) { e.textContent = '—'; return; }
+    const r = forP(d)[0]; const pct = r[cur] / r[goal];
+    e.textContent = pct >= 1 ? 'Meta batida' : R.pct(pct) + ' da meta';
+    e.style.color = pct >= 1 ? 'var(--color-ok)' : pct >= 0.6 ? 'var(--color-fg)' : 'var(--color-warn)';
+  });
+  gstate('gs-novos', 'novos_artistas', 'meta_novos'); gstate('gs-alvo', 'alvo_parte', 'meta_alvo'); gstate('gs-horas', 'horas', 'meta_horas');
+  ring('g-minutos', 'minutos', 'meta_minutos', R.int, ' min', 'escuta'); ring('g-plays', 'reproducoes', 'meta_reproducoes', R.int, '', 'escuta');
+  gstate('gs-minutos', 'minutos', 'meta_minutos', 'escuta'); gstate('gs-plays', 'reproducoes', 'meta_reproducoes', 'escuta');
+  dash.draw('w-escuta', (e) => { const d = ok('escuta'); e.textContent = d && d[0].desde ? R.dia(d[0].desde) : 'a primeira sincronização'; });
+  dash.draw('k-cobertura', (e) => { where(e); const d = ok('resumo'); e.textContent = d ? R.pct(forP(d)[0].cobertura) : '—'; });
+
+  const favList = (name, id, kind) => dash.draw(name, (e) => {
+    const rows = ok(id); const cm = capaMap();
+    if (!rows) return fail(e, id);
+    e.replaceChildren();
+    if (!rows.length) { e.append(el('span', 'rr-empty', 'O Spotify não devolveu nenhum item agora.')); return; }
+    const top = rows[0];
+    const a = el('a', 'rr-fav1'); a.href = top.link; a.target = '_blank'; a.rel = 'noopener';
+    const t = el('div');
+    t.append(el('small', null, kind === 'faixa' ? 'Faixa favorita' : 'Banda favorita'), el('b', null, kind === 'faixa' ? top.faixa : top.artista));
+    if (kind === 'faixa') t.append(el('span', null, top.artista));
+    a.append(img(cm.get('uri|' + top.uri) || (kind === 'faixa' ? cm.get('album|' + top.album + ' — ' + top.artista.split(', ')[0]) : ''), kind === 'faixa' ? top.faixa : top.artista), t);
+    e.append(a);
+    rows.slice(1, 5).forEach((r) => {
+      const row = el('a', 'rr-favrow'); row.href = r.link; row.target = '_blank'; row.rel = 'noopener';
+      const label = el('span'); label.append(document.createTextNode(kind === 'faixa' ? r.faixa : r.artista));
+      if (kind === 'faixa') { label.append(document.createTextNode(' ')); label.append(el('small', null, r.artista)); }
+      row.append(el('i', null, '#' + r.posicao), img(cm.get('uri|' + r.uri), kind === 'faixa' ? r.faixa : r.artista), label);
+      e.append(row);
+    });
+  });
+  favList('fav-faixas', 'mais_ouvidas', 'faixa'); favList('fav-artistas', 'artistas_mais_ouvidos', 'artista');
+  stat('k-bpm', 'bpm', R.int); stat('k-antes', 'antes2000', R.pct); stat('m-manual', 'manual', R.int);
+  const meter = (name, field) => dash.draw(name, (e) => {
+    where(e);
+    const d = ok('resumo');
+    e.replaceChildren();
+    const i = document.createElement('i');
+    i.style.width = d ? Math.round(forP(d)[0][field] * 100) + '%' : '0';
+    e.append(i);
+  });
+
+  dash.draw('mosaico', (e) => {
+    const rows = ok('top_albuns'); const cm = capaMap();
+    if (!rows) return fail(e, 'top_albuns');
+    e.replaceChildren();
+    forP(rows).slice(0, 7).forEach((r, i) => { const im = img(cm.get('album|' + r.capa), r.capa); im.title = r.capa + ' · ' + r.faixas + ' faixas'; im.style.animationDelay = (i * 40) + 'ms'; im.classList.add('rr-in'); e.append(im); });
+  });
+
+  dash.draw('rail', (e) => {
+    const rows = ok('recentes'); const cm = capaMap();
+    if (!rows) return fail(e, 'recentes');
+    e.replaceChildren();
+    forP(rows).forEach((r) => {
+      const a = el('a', 'rr-tile'); a.href = r.link; a.target = '_blank'; a.rel = 'noopener';
+      a.append(img(cm.get('album|' + r.capa), r.capa), el('b', null, r.faixa), el('span', null, r.artista));
+      const t = el('span', 'tag'); const dot = el('i'); dot.style.background = R.color(r.familia);
+      t.append(dot, document.createTextNode(R.dia(r.data))); a.append(t);
+      e.append(a);
+    });
+  });
+
+  dash.draw('artistas', (e) => {
+    const rows = ok('top_artistas'); const cm = capaMap();
+    if (!rows) return fail(e, 'top_artistas');
+    e.replaceChildren();
+    forP(rows).forEach((r, i) => {
+      const c = el('div', 'rr-artist');
+      const who = el('div', 'who');
+      const rank = el('span', 'rr-rank', '#' + (i + 1) + ' · ' + r.familia);
+      who.append(el('b', null, r.artista), rank);
+      const n = el('div', 'n', R.int(r.faixas));
+      c.append(img(cm.get('album|' + r.capa), r.capa), who, n);
+      e.append(c);
+    });
+  });
+
+  dash.draw('c-fam', (e) => {
+    const all = ok('por_familia');
+    if (!all) return fail(e, 'por_familia');
+    e.replaceChildren();
+    const rows = forP(all);
+    const W = Math.max(280, e.clientWidth), rh = 26, H = rows.length * rh + 6;
+    const svg = d3.select(e).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const ml = d3.max(rows, (d) => textW(svg, d.familia)) + 12;
+    const mr = textW(svg, '100% · 0,00') + 10;
+    const x = d3.scaleLinear([0, d3.max(rows, (d) => d.parte)], [ml, W - mr]);
+    const g = svg.append('g').selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${i * rh + 3})`);
+    g.append('text').attr('x', ml - 10).attr('y', rh / 2 - 2).attr('dy', '0.32em').attr('text-anchor', 'end').text((d) => d.familia);
+    g.append('rect').attr('x', ml).attr('y', 4).attr('height', rh - 12).attr('rx', 4).attr('width', (d) => Math.max(2, x(d.parte) - ml)).attr('fill', (d) => R.color(d.familia));
+    g.append('text').attr('x', (d) => x(d.parte) + 6).attr('y', rh / 2 - 2).attr('dy', '0.32em').text((d) => R.pct(d.parte) + ' · ' + R.dec2(d.energia));
+  });
+
+  dash.draw('c-scatter', (e) => {
+    const raw = ok('janelas'); const cm = capaMap();
+    if (!raw) return fail(e, 'janelas');
+    e.replaceChildren();
+    const rows = forP(raw).filter((r) => r.energia !== '' && r.valencia !== '');
+    const W = Math.max(280, e.clientWidth), H = 360, ml = 36, mb = 30;
+    const svg = d3.select(e).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const x = d3.scaleLinear([0, 1], [ml, W - 8]);
+    const y = d3.scaleLinear([0, 1], [H - mb, 8]);
+    [0, 0.25, 0.5, 0.75, 1].forEach((v) => {
+      const s = v === 0.5 ? 'var(--cds-chart-reference)' : 'var(--cds-chart-grid)';
+      svg.append('line').attr('x1', x(v)).attr('x2', x(v)).attr('y1', y(0)).attr('y2', y(1)).attr('stroke', s);
+      svg.append('line').attr('x1', x(0)).attr('x2', x(1)).attr('y1', y(v)).attr('y2', y(v)).attr('stroke', s);
+      svg.append('text').attr('x', x(v)).attr('y', H - mb + 16).attr('text-anchor', 'middle').text(R.dec2(v).replace(',00', ''));
+      svg.append('text').attr('x', ml - 6).attr('y', y(v)).attr('dy', '0.32em').attr('text-anchor', 'end').text(R.dec2(v).replace(',00', ''));
+    });
+    svg.append('text').attr('x', W - 8).attr('y', H - 2).attr('text-anchor', 'end').text('valência →');
+    const q = [['Intenso e sombrio', 0.02, 0.96, 'start'], ['Intenso e alegre', 0.98, 0.96, 'end'], ['Calmo e melancólico', 0.02, 0.04, 'start'], ['Calmo e leve', 0.98, 0.04, 'end']];
+    svg.append('g').selectAll('text').data(q).join('text').attr('x', (d) => x(d[1])).attr('y', (d) => y(d[2])).attr('text-anchor', (d) => d[3]).attr('opacity', 0.75).text((d) => d[0]);
+    const order = (r) => (R.ROCK.includes(r.familia) ? 1 : 0);
+    const rad = rows.length < 40 ? 6 : 4.5;
+    const dots = svg.append('g').selectAll('circle').data(rows.slice().sort((a, b) => order(a) - order(b))).join('circle')
+      .attr('cx', (r) => x(Number(r.valencia))).attr('cy', (r) => y(Number(r.energia))).attr('r', rad)
+      .attr('fill', (r) => R.color(r.familia)).attr('fill-opacity', 0.85).attr('stroke', 'var(--color-panel)').attr('stroke-width', 1.2);
+    const t = el('div', 'rr-tip'); t.hidden = true; e.append(t);
+    const pts = rows.map((r) => [x(Number(r.valencia)), y(Number(r.energia)), r]);
+    if (!pts.length) return;
+    const del = d3.Delaunay.from(pts, (p) => p[0], (p) => p[1]);
+    svg.append('rect').attr('x', ml).attr('y', 8).attr('width', W - 8 - ml).attr('height', H - mb - 8).attr('fill', 'transparent')
+      .on('mousemove', (ev) => {
+        const [px, py] = d3.pointer(ev, svg.node());
+        const p = pts[del.find(px, py)];
+        if (Math.hypot(p[0] - px, p[1] - py) > 24) { t.hidden = true; dots.attr('r', rad); return; }
+        const r = p[2];
+        dots.attr('r', (d) => (d === r ? rad + 3 : rad));
+        t.replaceChildren();
+        const info = el('div');
+        info.append(el('div', null, r.faixa), el('div', 'k', r.artista), el('div', 'k', 'Energia ' + R.dec2(Number(r.energia)) + ' · Valência ' + R.dec2(Number(r.valencia))));
+        t.append(img(cm.get('album|' + r.capa), r.capa), info);
+        t.hidden = false;
+        const [ex, ey] = d3.pointer(ev, e);
+        t.style.left = Math.max(0, Math.min(e.clientWidth - t.offsetWidth, ex + 12)) + 'px';
+        t.style.top = Math.max(0, ey - t.offsetHeight - 10) + 'px';
+      })
+      .on('mouseleave', () => { t.hidden = true; dots.attr('r', rad); });
+  });
+
+  dash.draw('c-mes', (e) => {
+    const rows = ok('por_mes'); const res = ok('resumo');
+    if (!rows) return fail(e, 'por_mes');
+    e.replaceChildren();
+    const desde = res ? forP(res)[0].desde.slice(0, 7) : '';
+    const W = Math.max(280, e.clientWidth), H = 240;
+    const svg = d3.select(e).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const y = d3.scaleLinear([0, d3.max(rows, (d) => d.total)], [H - 28, 8]).nice();
+    const ml = textW(svg, R.int(y.domain()[1])) + 10;
+    const x = d3.scaleBand(rows.map((d) => d.mes), [ml, W - 4]).padding(0.25);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', ml).attr('x2', W - 4).attr('y1', y).attr('y2', y).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', ml - 6).attr('y', y).attr('dy', '0.32em').attr('text-anchor', 'end').text(R.int);
+    const keys = [...R.ROCK, 'outros'];
+    const stackRows = rows.map((d) => { const o = {mes: d.mes}; R.ROCK.forEach((k) => { o[k] = d[k] || 0; }); o.outros = d.total - R.ROCK.reduce((a, k) => a + (d[k] || 0), 0); return o; });
+    const bw = Math.min(32, x.bandwidth()), off = (x.bandwidth() - bw) / 2;
+    svg.append('g').selectAll('g').data(d3.stack().keys(keys)(stackRows)).join('g').attr('fill', (s) => R.color(s.key))
+      .selectAll('rect').data((s) => s).join('rect')
+      .attr('x', (d) => x(d.data.mes) + off).attr('width', bw)
+      .attr('y', (d) => y(d[1])).attr('height', (d) => Math.max(0, y(d[0]) - y(d[1])))
+      .attr('opacity', (d) => (d.data.mes >= desde ? 1 : 0.22));
+    const every = Math.ceil(rows.length / Math.max(1, Math.floor((W - ml) / 46)));
+    svg.append('g').selectAll('text').data(rows.filter((d, i) => i % every === 0)).join('text')
+      .attr('x', (d) => x(d.mes) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').text((d) => R.mes(d.mes));
+    const t = el('div', 'rr-tip'); t.hidden = true; e.append(t);
+    svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', (d) => x(d.mes)).attr('width', x.bandwidth()).attr('y', 0).attr('height', H - 28).attr('fill', 'transparent')
+      .on('mousemove', (ev, d) => {
+        t.replaceChildren();
+        const box = el('div');
+        box.append(el('div', 'k', R.mes(d.mes) + ' · ' + R.int(d.total) + ' faixas'));
+        R.ROCK.filter((k) => d[k]).forEach((k) => box.append(el('div', null, k + ': ' + R.int(d[k]))));
+        const other = d.total - R.ROCK.reduce((a, k) => a + (d[k] || 0), 0);
+        if (other) box.append(el('div', null, 'Trilhas, MPB e pop: ' + R.int(other)));
+        t.append(box); t.hidden = false;
+        const [px, py] = d3.pointer(ev, e);
+        t.style.left = Math.max(0, Math.min(e.clientWidth - t.offsetWidth, px + 12)) + 'px';
+        t.style.top = Math.max(0, py - t.offsetHeight - 8) + 'px';
+      })
+      .on('mouseleave', () => { t.hidden = true; });
+  });
+
+  dash.draw('c-dec', (e) => {
+    const all = ok('por_decada');
+    if (!all) return fail(e, 'por_decada');
+    e.replaceChildren();
+    const rows = forP(all);
+    const W = Math.max(280, e.clientWidth), H = 240;
+    const svg = d3.select(e).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const y = d3.scaleLinear([0, d3.max(rows, (d) => d.faixas) || 1], [H - 28, 18]).nice();
+    const ml = textW(svg, R.int(y.domain()[1])) + 10;
+    const x = d3.scaleBand(rows.map((d) => d.decada), [ml, W - 4]).padding(0.3);
+    svg.append('g').selectAll('line').data(y.ticks(4)).join('line').attr('x1', ml).attr('x2', W - 4).attr('y1', y).attr('y2', y).attr('stroke', 'var(--cds-chart-grid)');
+    svg.append('g').selectAll('text').data(y.ticks(4)).join('text').attr('x', ml - 6).attr('y', y).attr('dy', '0.32em').attr('text-anchor', 'end').text(R.int);
+    const bw = Math.min(32, x.bandwidth()), off = (x.bandwidth() - bw) / 2;
+    svg.append('g').selectAll('rect').data(rows).join('rect').attr('x', (d) => x(d.decada) + off).attr('width', bw).attr('rx', 4)
+      .attr('y', (d) => y(d.faixas)).attr('height', (d) => y(0) - y(d.faixas))
+      .attr('fill', (d) => (Number(d.decada.slice(0, 4)) < 2000 ? dash.colors[5 % dash.colors.length] : 'var(--cds-chart-muted)'));
+    svg.append('g').selectAll('text').data(rows).join('text').attr('x', (d) => x(d.decada) + x.bandwidth() / 2).attr('y', (d) => y(d.faixas) - 5).attr('text-anchor', 'middle').text((d) => R.int(d.faixas));
+    svg.append('g').selectAll('text').data(rows).join('text').attr('x', (d) => x(d.decada) + x.bandwidth() / 2).attr('y', H - 8).attr('text-anchor', 'middle').text((d) => "'" + d.decada.slice(2));
+  });
+
+  dash.draw('tb-fam', (tb) => {
+    const all = ok('por_familia');
+    tb.replaceChildren();
+    if (!all) return;
+    forP(all).forEach((d) => {
+      const tr = document.createElement('tr'); tr.dataset.key = d.periodo + ',' + encodeURIComponent(d.familia);
+      const c0 = document.createElement('td'); const dot = el('span', 'rr-dot'); dot.style.background = R.color(d.familia);
+      c0.append(dot, document.createTextNode(d.familia)); tr.append(c0);
+      [[R.int(d.faixas), ''], [R.dec2(d.energia), ''], [R.dec2(d.valencia), ''], [R.dec2(d.dancabilidade), 'rr-hide-sm'], [R.int(d.bpm), '']].forEach(([v, cls]) => {
+        tr.append(el('td', 'num ' + cls, v));
+      });
+      tb.append(tr);
+    });
+  });
+
+  dash.draw('recs', (e) => {
+    const rows = ok('recomendacoes'); const cm = capaMap();
+    if (!rows) return fail(e, 'recomendacoes');
+    e.replaceChildren();
+    rows.filter((r) => (!R.cat || r.categoria === R.cat) && (!R.onlyNew || r.status === 'Novo para você')).forEach((r) => {
+      const card = el('article', 'rr-rec');
+      const pic = el('a', 'pic'); pic.href = r.link; pic.target = '_blank'; pic.rel = 'noopener';
+      pic.append(img(cm.get('artista|' + r.artista), r.artista), el('span', 'pill' + (r.status === 'Novo para você' ? ' new' : ''), r.status));
+      const body = el('div', 'body');
+      const name = el('a', 'name', r.artista); name.href = r.link; name.target = '_blank'; name.rel = 'noopener';
+      const bridge = el('div', 'bridge'); bridge.append(document.createTextNode('Ponte: '), el('b', null, r.ponte));
+      body.append(el('span', 'cat', r.categoria), name, el('span', 'style', r.estilo), bridge);
+      if (r.link_faixa) { const s = el('a', 'start', '▶ ' + r.faixa_de_entrada); s.href = r.link_faixa; s.target = '_blank'; s.rel = 'noopener'; body.append(s); }
+      card.append(pic, body);
+      e.append(card);
+    });
+  });
+</script>
+
+</main>
+<script src="/app.js"></script>
+</body>
+</html>

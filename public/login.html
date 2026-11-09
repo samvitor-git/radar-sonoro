@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Radar Sonoro</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400&display=swap">
+<link rel="stylesheet" href="/theme.css">
+<style>
+  .login { min-height: 100vh; display: grid; place-items: center; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+  .login-card { max-width: 26rem; display: flex; flex-direction: column; gap: 16px; padding: 32px; border-radius: 20px; background: var(--color-panel); border: 1px solid var(--color-border-line); }
+  .login-card h1 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: 2.4rem; }
+  .login-card p { margin: 0; color: var(--color-fg-muted); line-height: 1.55; }
+  .login-card a.app-btn { text-decoration: none; text-align: center; padding: 12px 18px; font-size: 1rem; }
+  .login-err { color: var(--color-bad); font-size: var(--cds-font-size-caption); }
+</style>
+</head>
+<body>
+<div class="login">
+  <div class="login-card">
+    <h1>Radar Sonoro</h1>
+    <p>Seu gosto musical em números: intensidade, humor, vertentes, metas e selos, a partir da sua conta do Spotify.</p>
+    <a class="app-btn" href="/login">Entrar com Spotify</a>
+    <span class="login-err" id="login-err" hidden></span>
+  </div>
+</div>
+<script>
+  const e = new URLSearchParams(location.search).get('erro');
+  if (e) { const el = document.getElementById('login-err'); el.textContent = e; el.hidden = false; }
+</script>
+</body>
+</html>
