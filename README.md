@@ -17,7 +17,13 @@ Rode como root:
 curl -fsSL https://raw.githubusercontent.com/samvitor-git/radar-sonoro/main/install.sh | bash
 ```
 
-O script instala o Docker se faltar, baixa o código e pede o Client Secret do Spotify na primeira vez (ele fica só no arquivo `/opt/radar-sonoro/.env`). Depois sobe a aplicação com HTTPS automático. Para atualizar, rode o mesmo comando: os dados e o `.env` são mantidos.
+O script instala o Docker se faltar, baixa o código e pede o Client Secret do Spotify na primeira vez (ele fica só no arquivo `/opt/radar-sonoro/.env`). Para atualizar, rode o mesmo comando: os dados e o `.env` são mantidos.
+
+### Proxy
+
+O app roda atrás do Caddy que já existe no servidor (`meu-dia-caddy-1`, rede `meu-dia_frontend`), com o nome `radarsonoro-app` nessa rede. Na instalação, o script acrescenta o bloco do domínio ao Caddyfile desse proxy. Antes, ele guarda uma cópia de segurança ao lado do arquivo. Se a configuração nova não passar na validação, ele desfaz a mudança. Se passar, recarrega o proxy sem reiniciar. Se uma publicação do meu-dia substituir o Caddyfile, rode o instalador de novo para religar o domínio. Para outro proxy, defina `PROXY_CONTAINER` e `PROXY_NETWORK` antes de rodar.
+
+Num servidor sem proxy, use `docker-compose.standalone.yml`, que traz o próprio Caddy nas portas 80 e 443.
 
 ## Comandos úteis
 

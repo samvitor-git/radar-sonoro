@@ -52,19 +52,45 @@ EOF
   chmod 600 .env
 fi
 
-if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
-  say "Liberando as portas 80 e 443 no firewall"
-  ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
-fi
+PROXY_CONTAINER="${PROXY_CONTAINER:-meu-dia-caddy-1}"
+PROXY_NETWORK="${PROXY_NETWORK:-meu-dia_frontend}"
+grep -q '^PROXY_NETWORK=' .env || echo "PROXY_NETWORK=$PROXY_NETWORK" >> .env
 
-if ss -ltn '( sport = :80 or sport = :443 )' | grep -q LISTEN && ! docker ps --format '{{.Names}}' | grep -q '^radar-sonoro-caddy'; then
-  warn "As portas 80/443 já estão em uso por outro serviço deste servidor. Nada foi alterado nele."
-  echo "O Radar Sonoro precisa entrar atrás do proxy que já existe. Peça a configuração ao Claude."
+if ! docker ps --format '{{.Names}}' | grep -qx "$PROXY_CONTAINER"; then
+  warn "Não encontrei o proxy $PROXY_CONTAINER rodando. Nada foi alterado."
+  exit 1
+fi
+if ! docker network inspect "$PROXY_NETWORK" >/dev/null 2>&1; then
+  warn "Não encontrei a rede $PROXY_NETWORK. Nada foi alterado."
   exit 1
 fi
 
 say "Subindo a aplicação"
 docker compose up -d --build --remove-orphans
+
+say "Ligando o domínio no proxy $PROXY_CONTAINER"
+CF="$(docker inspect "$PROXY_CONTAINER" --format '{{range .Mounts}}{{if eq .Destination "/etc/caddy/Caddyfile"}}{{.Source}}{{end}}{{end}}')"
+if [ -z "$CF" ] || [ ! -f "$CF" ]; then
+  warn "Não achei o Caddyfile do proxy. O app está no ar, mas o domínio ainda não foi ligado."
+  exit 1
+fi
+if grep -qE "^${DOMAIN//./\\.}[[:space:]]*\{" "$CF"; then
+  echo "O domínio já estava configurado em $CF. Nada a mudar."
+else
+  BACKUP="$CF.bak-radar-$(date +%Y%m%d%H%M%S)"
+  cp -p "$CF" "$BACKUP"
+  # Acrescenta no fim do arquivo sem trocar o arquivo (o proxy lê este mesmo arquivo).
+  printf '\n%s {\n\tencode zstd gzip\n\treverse_proxy radarsonoro-app:3000\n\tlog {\n\t\toutput stdout\n\t\tformat json\n\t}\n}\n' "$DOMAIN" >> "$CF"
+  if docker exec "$PROXY_CONTAINER" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    docker exec "$PROXY_CONTAINER" caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+    echo "Configuração aplicada sem reiniciar o proxy. Cópia de segurança: $BACKUP"
+  else
+    cat "$BACKUP" > "$CF"
+    warn "A configuração nova não passou na validação e foi desfeita. Os outros sites não foram afetados."
+    docker exec "$PROXY_CONTAINER" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile || true
+    exit 1
+  fi
+fi
 
 IP="$(curl -fsS https://api.ipify.org || true)"
 DNS="$(dig +short "$DOMAIN" A | tail -n1 || true)"

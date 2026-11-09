@@ -1,34 +1,23 @@
+# O Radar Sonoro roda atrás de um proxy Caddy que já existe no servidor.
+# O app entra na rede desse proxy com o nome radarsonoro-app.
 services:
   app:
     build: .
     restart: unless-stopped
     env_file: .env
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
     environment:
       DATA_DIR: /data
-    volumes:
-      - ./data:/data
-    expose:
-      - "3000"
-  caddy:
-    image: caddy:2.8
-    restart: unless-stopped
     dns:
       - 1.1.1.1
       - 8.8.8.8
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - app
-volumes:
-  caddy_data:
-  caddy_config:
+      - ./data:/data
+    networks:
+      proxy:
+        aliases:
+          - radarsonoro-app
+
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-meu-dia_frontend}
